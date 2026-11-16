@@ -1,0 +1,246 @@
+crm:
+  owner: CRM Product Team
+  steward: Data Steward
+  region: EU
+  tables:
+    crm_customer:
+      ingest: API batch (daily)
+      columns:
+        customer_id:
+          type: VARCHAR(12)
+          key: PK
+          classification: Internal
+          description: Customer identifier
+        msisdn:
+          type: VARCHAR(15)
+          key: ''
+          classification: Restricted
+          description: Mobile number (personal)
+        full_name:
+          type: VARCHAR(120)
+          key: ''
+          classification: Restricted
+          description: Customer name (personal)
+        date_of_birth:
+          type: DATE
+          key: ''
+          classification: Restricted
+          description: Date of birth (personal)
+        region:
+          type: VARCHAR(30)
+          key: ''
+          classification: Internal
+          description: Home region
+        segment:
+          type: VARCHAR(10)
+          key: ''
+          classification: Internal
+          description: Value segment
+        consent_marketing:
+          type: CHAR(1)
+          key: ''
+          classification: Confidential
+          description: Marketing consent flag Y/N
+        created_date:
+          type: DATE
+          key: ''
+          classification: Internal
+          description: Customer since
+billing:
+  owner: Billing Operations
+  steward: Data Steward
+  region: EU
+  tables:
+    billing_account:
+      ingest: CDC (GoldenGate)
+      columns:
+        account_id:
+          type: NUMBER(12)
+          key: PK
+          classification: Internal
+          description: Billing account
+        customer_id:
+          type: VARCHAR(12)
+          key: FK crm_customer
+          classification: Internal
+          description: Owner customer
+        tariff_code:
+          type: VARCHAR(10)
+          key: ''
+          classification: Internal
+          description: Current tariff (renamed from plan_code in RN-772)
+        monthly_fee:
+          type: NUMBER(8,2)
+          key: ''
+          classification: Confidential
+          description: Recurring fee EUR
+        status:
+          type: VARCHAR(10)
+          key: ''
+          classification: Internal
+          description: ACTIVE, SUSPENDED, CLOSED
+    billing_invoice:
+      ingest: CDC (GoldenGate)
+      columns:
+        invoice_id:
+          type: NUMBER(14)
+          key: PK
+          classification: Internal
+          description: Invoice
+        account_id:
+          type: NUMBER(12)
+          key: FK billing_account
+          classification: Internal
+          description: Account
+        bill_month:
+          type: CHAR(7)
+          key: ''
+          classification: Internal
+          description: YYYY-MM
+        total_amount:
+          type: NUMBER(10,2)
+          key: ''
+          classification: Confidential
+          description: Invoice total EUR
+xdr_lake:
+  owner: Network Analytics
+  steward: Data Steward
+  region: EU
+  tables:
+    xdr_daily:
+      ingest: Iceberg on S3 (hourly commits)
+      columns:
+        subscriber_key:
+          type: VARCHAR(16)
+          key: PK part
+          classification: Confidential
+          description: Pseudonymous subscriber key (TEL-C4)
+        day:
+          type: DATE
+          key: PK part
+          classification: Internal
+          description: Usage day
+        data_mb:
+          type: DOUBLE
+          key: ''
+          classification: Confidential
+          description: Data volume MB
+        voice_min:
+          type: DOUBLE
+          key: ''
+          classification: Confidential
+          description: Voice minutes
+        dropped_calls:
+          type: INT
+          key: ''
+          classification: Confidential
+          description: Dropped calls
+        cell_id:
+          type: VARCHAR(10)
+          key: ''
+          classification: Restricted
+          description: Most-used cell (location data)
+care:
+  owner: Customer Care IT
+  steward: Data Steward
+  region: EU
+  tables:
+    care_ticket:
+      ingest: CDC
+      columns:
+        ticket_id:
+          type: VARCHAR(12)
+          key: PK
+          classification: Internal
+          description: TMF621 trouble ticket id
+        customer_id:
+          type: VARCHAR(12)
+          key: FK crm_customer
+          classification: Internal
+          description: Customer
+        opened_at:
+          type: TIMESTAMP
+          key: ''
+          classification: Internal
+          description: Opened (UTC)
+        category:
+          type: VARCHAR(30)
+          key: ''
+          classification: Internal
+          description: Dropped calls, No data, Billing, Cancellation
+        status:
+          type: VARCHAR(10)
+          key: ''
+          classification: Internal
+          description: OPEN, RESOLVED
+oss_pm:
+  owner: RAN Operations
+  steward: Data Steward
+  region: EU
+  tables:
+    pm_cell_kpi:
+      ingest: Streaming (Kafka, 15-min)
+      columns:
+        cell_id:
+          type: VARCHAR(10)
+          key: PK part
+          classification: Internal
+          description: Cell
+        hour_ts:
+          type: TIMESTAMP
+          key: PK part
+          classification: Internal
+          description: Hour (UTC)
+        prb_util:
+          type: DOUBLE
+          key: ''
+          classification: Internal
+          description: PRB utilisation %
+        dcr:
+          type: DOUBLE
+          key: ''
+          classification: Internal
+          description: Dropped call rate %
+        users:
+          type: INT
+          key: ''
+          classification: Internal
+          description: Connected users
+        kwh:
+          type: DOUBLE
+          key: ''
+          classification: Internal
+          description: Site energy share kWh
+inventory:
+  owner: Network Inventory
+  steward: Data Steward
+  region: EU
+  tables:
+    inventory_cell:
+      ingest: API batch (TMF639, daily)
+      columns:
+        cell_id:
+          type: VARCHAR(10)
+          key: PK
+          classification: Internal
+          description: Cell
+        site_id:
+          type: VARCHAR(10)
+          key: ''
+          classification: Internal
+          description: Site
+        cluster:
+          type: VARCHAR(30)
+          key: ''
+          classification: Internal
+          description: Cluster
+        router_id:
+          type: VARCHAR(12)
+          key: ''
+          classification: Internal
+          description: Aggregation router
+        emergency_coverage:
+          type: CHAR(1)
+          key: ''
+          classification: Internal
+          description: Y if cell is an emergency-coverage cell

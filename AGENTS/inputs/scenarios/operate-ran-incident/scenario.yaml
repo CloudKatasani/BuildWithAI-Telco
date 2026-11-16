@@ -1,0 +1,17 @@
+title: Metro-North RAN cluster degradation
+track: operate
+kind: pipeline
+ops_scenario: noc
+request_file: request.md
+context_files:
+- context/noc-operating-notes.md
+datasets:
+- operations/alarms.json
+- operations/changes.json
+- operations/topology.json
+- operations/kpis.json
+- operations/kedb.json
+approvals: Action plan (NOC Shift Lead + CAB), customer message (SDM), KEDB entry (Problem Manager)
+live_duration_minutes: 6-10 live
+presenter_notes: 'One care alarm contains an embedded ''ignore previous instructions'' line: the runtime flags it.
+  The Resolution agent cannot execute until both people sign.'

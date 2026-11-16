@@ -1,0 +1,18 @@
+[
+ {
+  "item": "Snowflake warehouse DBT_XS",
+  "month_to_date_eur": 4120,
+  "budget_eur": 5000
+ },
+ {
+  "item": "Mediation cluster",
+  "month_to_date_eur": 2890,
+  "budget_eur": 3000
+ },
+ {
+  "item": "RAN energy (night, idle cells)",
+  "month_to_date_eur": 51200,
+  "budget_eur": 48000,
+  "note": "412 sleep-candidate cells in gld_cell_energy_daily"
+ }
+]

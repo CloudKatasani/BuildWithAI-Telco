@@ -1,0 +1,107 @@
+{
+ "MN07-C01": {
+  "type": "cell",
+  "site": "MN07-S1",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C02": {
+  "type": "cell",
+  "site": "MN07-S1",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C03": {
+  "type": "cell",
+  "site": "MN07-S1",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C04": {
+  "type": "cell",
+  "site": "MN07-S2",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C05": {
+  "type": "cell",
+  "site": "MN07-S2",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C06": {
+  "type": "cell",
+  "site": "MN07-S2",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C07": {
+  "type": "cell",
+  "site": "MN07-S3",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C08": {
+  "type": "cell",
+  "site": "MN07-S3",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C09": {
+  "type": "cell",
+  "site": "MN07-S3",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C10": {
+  "type": "cell",
+  "site": "MN07-S4",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C11": {
+  "type": "cell",
+  "site": "MN07-S4",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C12": {
+  "type": "cell",
+  "site": "MN07-S4",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C13": {
+  "type": "cell",
+  "site": "MN07-S5",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN07-C14": {
+  "type": "cell",
+  "site": "MN07-S5",
+  "router": "MN-AGG-2",
+  "cluster": "MN-07"
+ },
+ "MN-AGG-2": {
+  "type": "router",
+  "services": [
+   "Mobile RAN backhaul MN-07",
+   "VPN-NORTHWIND-01",
+   "VPN-CONTOSO-03",
+   "DIA-FABRIKAM-02"
+  ]
+ },
+ "VPN-NORTHWIND-01": {
+  "type": "service",
+  "account": "Northwind Logistics"
+ },
+ "VPN-CONTOSO-03": {
+  "type": "service",
+  "account": "Contoso Health"
+ },
+ "DIA-FABRIKAM-02": {
+  "type": "service",
+  "account": "Fabrikam Retail"
+ }
+}

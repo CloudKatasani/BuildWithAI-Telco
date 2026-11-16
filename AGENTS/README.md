@@ -18,7 +18,9 @@ AGENTS/
   consume/agents/*.md          6 agent definitions         consume/skills/<id>/SKILL.md
   telcocrew/                   runtime: registry, guardrails, tools, Claude provider, simulator,
                                runner, workflows, HTTP API, CLI
-  tests/                       contract, guardrail and end-to-end tests
+  inputs/                      synthetic datasets (CSV/YAML/JSON) and 11 demo scenario packs
+  artifacts/                   one folder per run: inputs used, workspace outputs, transcript, approvals, audit
+  tests/                       contract, guardrail, inputs/artifacts and end-to-end tests
 ```
 
 ## The agents
@@ -46,6 +48,36 @@ Each agent's system prompt is: its definition body, then `telco-shared-guardrail
 | Prompt-injection text in alarms or tickets flagged and treated as data | `guardrails.scan_injection` |
 | Append-only, hash-chained audit log | `guardrails.AuditLog` |
 | Pipelines pause on every approval request; reject stops, "request changes" reruns the step (return limit 3) | `workflows.Pipeline` |
+
+## Live demo runbook (real Claude, synthetic data)
+
+1. **Install and check** (once, before the audience arrives):
+   ```bash
+   cd AGENTS && pip install -r requirements.txt
+   export ANTHROPIC_API_KEY=...
+   python -m telcocrew preflight          # SDK, key, model access (no tokens spent), datasets, scenarios, artifacts path
+   python -m telcocrew scenarios          # what you can run
+   ```
+2. **Start the web runtime** and open http://127.0.0.1:8765/#agents:
+   ```bash
+   python -m telcocrew serve
+   ```
+   Pick a track, choose a **Demo scenario**, optionally set model and effort (Sonnet 5.5 or low
+   effort for a faster room), press **Start scenario**, and approve, request changes or reject each
+   request as it appears. The panel shows the run record folder.
+3. **Or run from the terminal**, approving at the prompt:
+   ```bash
+   python -m telcocrew demo operate-ran-incident
+   python -m telcocrew demo build-churn-360 --model claude-sonnet-5-5
+   python -m telcocrew demo consume-guardrail-probe
+   ```
+4. **Show the evidence**: open `artifacts/<run-id>/transcript.md` (every tool call the model made),
+   `workspace/` (what the agents produced), `approvals.json` (who signed which hash) and `run.json`
+   (tokens and cost estimate).
+
+Inputs are described in [inputs/README.md](inputs/README.md) and the run record in
+[artifacts/README.md](artifacts/README.md). Without a key everything runs in the simulator, so a
+dry run the day before costs nothing.
 
 ## Run it
 

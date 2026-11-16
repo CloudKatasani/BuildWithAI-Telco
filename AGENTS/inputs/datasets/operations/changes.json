@@ -1,0 +1,26 @@
+[
+ {
+  "id": "CR-48213",
+  "time": "18:31",
+  "element": "MN07-C01..C14",
+  "summary": "Handover offset +3 dB pushed to 14 cells",
+  "by": "RAN optimisation",
+  "scenario": "noc"
+ },
+ {
+  "id": "RN-772",
+  "time": "22:15 (previous day)",
+  "element": "billing.TARIFF_PLAN",
+  "summary": "Column plan_code renamed to tariff_code",
+  "by": "Billing release",
+  "scenario": "dataops"
+ },
+ {
+  "id": "PRD-UL25",
+  "time": "14 days ago",
+  "element": "Product catalog",
+  "summary": "Tariff UL-25 launched; 210k migrations",
+  "by": "Commercial",
+  "scenario": "mlops"
+ }
+]

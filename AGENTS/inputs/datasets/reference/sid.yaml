@@ -1,0 +1,36 @@
+customer:
+  sid_entity: Customer / Party
+  tmf_api: TMF629 Customer, TMF632 Party
+account:
+  sid_entity: BillingAccount
+  tmf_api: TMF666 Account
+tariff:
+  sid_entity: ProductOffering
+  tmf_api: TMF620 Product Catalog
+subscription:
+  sid_entity: Product
+  tmf_api: TMF637 Product Inventory
+invoice:
+  sid_entity: CustomerBill
+  tmf_api: TMF678 Customer Bill
+usage:
+  sid_entity: Usage
+  tmf_api: TMF635 Usage
+cdr:
+  sid_entity: Usage
+  tmf_api: TMF635 Usage
+ticket:
+  sid_entity: TroubleTicket
+  tmf_api: TMF621 Trouble Ticket
+cell:
+  sid_entity: Resource (LogicalResource)
+  tmf_api: TMF639 Resource Inventory
+service:
+  sid_entity: Service
+  tmf_api: TMF638 Service Inventory
+alarm:
+  sid_entity: Alarm
+  tmf_api: TMF642 Alarm Management
+sla:
+  sid_entity: ServiceLevelAgreement
+  tmf_api: TMF657 Service Level Management

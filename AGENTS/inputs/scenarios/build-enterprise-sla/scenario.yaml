@@ -1,0 +1,13 @@
+title: Enterprise SLA and service health 360
+track: build
+kind: pipeline
+with_ml: false
+request_file: request.md
+context_files:
+- context/team-standards.md
+datasets:
+- care_ticket
+- gld_account_sla
+approvals: G0-G5, G7-G9 (no model, G6 skipped)
+live_duration_minutes: 10-15 live
+presenter_notes: Shows the pipeline skipping the ML stage when no model is needed.

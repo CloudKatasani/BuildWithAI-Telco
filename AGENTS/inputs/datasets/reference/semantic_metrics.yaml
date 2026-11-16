@@ -1,0 +1,108 @@
+metrics:
+  churn_at_risk_lines:
+    desc: Lines with churn risk score >= 0.7 this week
+    table: gld_churn_risk
+    expr: COUNT(*)
+    where: risk_score >= 0.7
+    dims:
+    - region
+    - value_segment
+    - top_driver
+    subscriber_level: true
+    glossary: churn
+    vq:
+    - Which regions have the highest churn risk this week?
+  at_risk_arpu:
+    desc: Monthly ARPU (EUR) of lines with risk >= 0.7
+    table: gld_churn_risk
+    expr: ROUND(SUM(arpu), 2)
+    where: risk_score >= 0.7
+    dims:
+    - region
+    - value_segment
+    subscriber_level: true
+    glossary: at-risk arpu
+    vq:
+    - How much monthly revenue is at risk?
+  churn_rate_30d:
+    desc: Share of lines churned in the last 30 days (%)
+    table: gld_churn_risk
+    expr: ROUND(100.0 * SUM(churned_30d) / COUNT(*), 2)
+    where: 1=1
+    dims:
+    - region
+    - value_segment
+    subscriber_level: true
+    glossary: churn
+    vq: []
+  idle_night_kwh:
+    desc: Night energy (kWh/day) on cells with PRB < 10%
+    table: gld_cell_energy_daily
+    expr: ROUND(SUM(idle_night_kwh), 1)
+    where: 1=1
+    dims:
+    - cluster
+    subscriber_level: false
+    glossary: sleep candidate
+    vq:
+    - Which clusters waste the most energy at night?
+  sleep_candidate_cells:
+    desc: Cells meeting the sleep rule and not emergency coverage
+    table: gld_cell_energy_daily
+    expr: SUM(sleep_candidate)
+    where: 1=1
+    dims:
+    - cluster
+    subscriber_level: false
+    glossary: sleep candidate
+    vq: []
+  leakage_eur:
+    desc: Revenue leakage EUR
+    table: gld_recon_daily
+    expr: ROUND(SUM(leakage_eur), 0)
+    where: 1=1
+    dims:
+    - month
+    - leak_point
+    subscriber_level: false
+    glossary: leakage
+    vq:
+    - How much revenue leaked last month and where?
+  sla_credit_exposure_eur:
+    desc: SLA credits due if the month closed now
+    table: gld_account_sla
+    expr: ROUND(SUM(credit_exposure_eur), 0)
+    where: 1=1
+    dims:
+    - account
+    - breach_forecast
+    subscriber_level: false
+    glossary: availability
+    vq:
+    - What is our SLA credit exposure?
+  accounts_breach_forecast:
+    desc: Top-200 accounts forecast to breach SLA this month
+    table: gld_account_sla
+    expr: SUM(breach_forecast)
+    where: 1=1
+    dims:
+    - account
+    subscriber_level: false
+    glossary: availability
+    vq:
+    - Which top-200 accounts are at risk of an SLA breach this month?
+lineage:
+  gld_churn_risk:
+  - slv_subscriber_month <- billing.billing_invoice, billing.billing_account
+  - slv_subscriber_month <- crm.crm_customer (pseudonymised key, consent)
+  - slv_usage_day <- xdr_lake.xdr_daily
+  - gld_churn_risk <- model churn_gbm v7 (MC-07)
+  gld_cell_energy_daily:
+  - slv_cell_hour <- oss_pm.pm_cell_kpi
+  - slv_cell_hour <- inventory.inventory_cell
+  - gld_cell_energy_daily <- traffic forecaster v3
+  gld_recon_daily:
+  - slv_event_chain <- mediation.mediated_cdr, ocs.rated_event, billing.invoice_line
+  gld_account_sla:
+  - slv_circuit_day <- service inventory (TMF638), transport KPIs
+  - gld_account_sla <- contracts.sla_term, care.care_ticket

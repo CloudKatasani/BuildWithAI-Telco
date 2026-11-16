@@ -1,0 +1,18 @@
+title: Subscriber Churn 360 data product
+track: build
+kind: pipeline
+request_file: request.md
+context_files:
+- context/team-standards.md
+- context/answers.md
+datasets:
+- crm_customer
+- billing_account
+- billing_invoice
+- xdr_daily
+- care_ticket
+- gld_churn_risk
+approvals: G0-G9 (10 gates, 14 signatures)
+live_duration_minutes: 12-20 live
+presenter_notes: Approve G0-G3 quickly. At G5, use 'Request changes' to show rework. Point out the masking probe
+  refused by the runtime and the lineage evidence at G9.

@@ -3400,7 +3400,7 @@ agent_instructions: |
 
   /* ---------------- Agents & skills (catalog + live runtime) ---------------- */
   const AM = window.AGENTS_MANIFEST || { agents: [], skills: [], people: {} };
-  const RT = { checked: false, ok: false, mode: '', session: null, pipeline: null, timer: null, state: null, busy: false };
+  const RT = { checked: false, ok: false, mode: '', session: null, pipeline: null, timer: null, state: null, busy: false, scenarios: [] };
   S.sel.agTrack = S.sel.agTrack || 'build';
   S.sel.agent = S.sel.agent || (AM.agents.find((a) => a.track === 'build') || {}).id;
   const TRACK_LABEL = { build: 'Build with AI', operate: 'Operate with AI', consume: 'Consume with AI' };
@@ -3415,7 +3415,11 @@ agent_instructions: |
     RT.checked = true;
     if (location.protocol === 'file:') { return; }
     fetch('api/health', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((j) => {
-      if (j && j.ok) { RT.ok = true; RT.mode = j.mode; if (S.view === 'agents') render('agents', true); }
+      if (j && j.ok) {
+        RT.ok = true; RT.mode = j.mode;
+        fetch('api/scenarios').then((r) => r.json()).then((sc) => { RT.scenarios = sc || []; if (S.view === 'agents') render('agents', true); }).catch(() => {});
+        if (S.view === 'agents') render('agents', true);
+      }
     }).catch(() => {});
   }
 
@@ -3451,7 +3455,19 @@ agent_instructions: |
       <div class="stat"><b>${(st.approvals || []).length}</b><span>Approval requests</span></div><div class="stat"><b>${arts.length}</b><span>Artifacts</span></div>
       <div class="stat"><b>${st.audit_valid ? 'valid' : '—'}</b><span>Audit chain (SHA-256)</span></div></div>
       ${aps}<div class="console">${ev || '<div class="empty">Waiting for events…</div>'}</div>${finals}
-      ${arts.length ? `<p class="sub">Artifacts: ${arts.map(esc).join(', ')}</p>` : ''}`;
+      ${arts.length ? `<p class="sub">Artifacts: ${arts.map(esc).join(', ')}</p>` : ''}
+      ${st.run_record ? `<p class="sub">Run record (inputs, workspace, transcript, audit, approvals, run.json): <code>${esc(st.run_record)}</code></p>` : ''}`;
+  }
+
+  function scenarioPickerHTML(track) {
+    const list = RT.scenarios.filter((x) => x.track === track);
+    if (!list.length) return '';
+    const cur = list.find((x) => x.id === S.sel.scenario) || list[0];
+    return `<div class="panel" style="padding:12px;background:var(--surface-2)"><div class="row"><label for="rt-scn"><b>Demo scenario</b></label>
+      <select id="rt-scn" style="flex:1;min-width:200px">${list.map((x) => `<option value="${esc(x.id)}" ${x.id === cur.id ? 'selected' : ''}>${esc(x.title)} (${esc(x.kind)})</option>`).join('')}</select>
+      <button class="btn primary" data-rt-scenario="${esc(cur.id)}">Start scenario</button></div>
+      <p class="sub" style="margin-top:6px">Inputs: <code>AGENTS/inputs/scenarios/${esc(cur.id)}/</code> · ${esc(cur.live_duration_minutes || '')} · approvals: ${esc(cur.approvals || 'none')}</p>
+      <p class="sub">Presenter notes: ${esc(cur.presenter_notes || '')}</p></div>`;
   }
 
   VIEWS.agents = function () {
@@ -3488,10 +3504,15 @@ agent_instructions: |
             ${own ? `<details class="art" style="margin-top:10px"><summary><span class="tag cls">SKILL.md</span>${esc(a.id)} · ${own.lines} lines<span class="sub">${own.sections.length} sections</span></summary><div style="padding:0 12px 12px"><div class="row">${own.sections.map((s) => `<span class="tag">${esc(s)}</span>`).join('')}</div><p class="sub" style="margin-top:8px">Full text: <code>AGENTS/${esc(track)}/skills/${esc(a.id)}/SKILL.md</code></p></div></details>` : ''}
           </div>
           <div class="panel"><div class="panel-head"><h3>Run this agent</h3>${RT.ok ? `<span class="tag ok">Runtime connected · ${esc(RT.mode === 'live' ? 'live (Claude)' : 'simulator')}</span>` : '<span class="tag">Runtime not connected</span>'}</div>
-            ${RT.ok ? `<div class="stack"><label class="sub" for="rt-task">Task</label><textarea id="rt-task" rows="3">${esc(SAMPLE_TASK[track])}</textarea>
+            ${RT.ok ? `<div class="stack">
+              ${scenarioPickerHTML(track)}
+              <label class="sub" for="rt-task">Task</label><textarea id="rt-task" rows="3">${esc(SAMPLE_TASK[track])}</textarea>
+              <div class="row">
+              <select id="rt-mode" aria-label="Mode"><option value="">Mode: server default (${esc(RT.mode)})</option><option value="simulator">Simulator</option><option value="live">Live (Claude)</option></select>
+              <select id="rt-model" aria-label="Model"><option value="">Model: agent default</option><option value="claude-opus-5-5">claude-opus-5-5</option><option value="claude-sonnet-5-5">claude-sonnet-5-5 (faster)</option><option value="claude-haiku-5-5">claude-haiku-5-5 (fastest)</option></select>
+              <select id="rt-effort" aria-label="Effort"><option value="">Effort: agent default</option><option>low</option><option>medium</option><option>high</option></select></div>
               <div class="row"><button class="btn primary" data-rt-run="${esc(a.id)}">Run ${esc(a.title)}</button>
-              ${track !== 'consume' ? `<button class="btn" data-rt-pipeline="${track}">Run the whole ${track} pipeline</button>` : ''}
-              <select id="rt-mode" aria-label="Mode"><option value="">Mode: server default</option><option value="simulator">Simulator</option><option value="live">Live (Claude)</option></select></div>
+              ${track !== 'consume' ? `<button class="btn" data-rt-pipeline="${track}">Run the whole ${track} pipeline</button>` : ''}</div>
               <div id="rt-out">${runtimeOutHTML()}</div></div>`
               : `<p class="sub">This page is running without the agent runtime, so the catalog above comes from the bundled manifest. To run the agents for real, start the runtime and open the page it serves:</p>
               <pre class="code">cd AGENTS
@@ -3504,20 +3525,28 @@ python -m telcocrew serve           # then open http://127.0.0.1:8765/#agents</p
       </div></div>`;
   };
 
+  document.addEventListener('change', (e) => {
+    if (e.target.id === 'rt-scn') { S.sel.scenario = e.target.value; render('agents', true); }
+  });
+
   document.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
     const d = t.dataset;
     if (d.agtrack) { S.sel.agTrack = d.agtrack; S.sel.agent = null; render('agents', true); }
     else if (d.agent) { S.sel.agent = d.agent; render('agents', true); }
-    else if (d.rtRun || d.rtPipeline) {
+    else if (d.rtRun || d.rtPipeline || d.rtScenario) {
       const task = (document.getElementById('rt-task') || {}).value || '';
-      const mode = (document.getElementById('rt-mode') || {}).value || undefined;
-      const req = d.rtRun ? rtPost(`api/agents/${d.rtRun}/run`, { task, mode, session_id: RT.pipeline ? null : RT.session }) : rtPost('api/pipelines', { track: d.rtPipeline, request: task, mode });
+      const val = (id) => (document.getElementById(id) || {}).value || undefined;
+      const opts = { mode: val('rt-mode'), model: val('rt-model'), effort: val('rt-effort') };
+      const scn = d.rtScenario ? val('rt-scn') || d.rtScenario : null;
+      const req = scn ? rtPost(`api/scenarios/${scn}/start`, opts)
+        : d.rtRun ? rtPost(`api/agents/${d.rtRun}/run`, { task, ...opts, session_id: RT.pipeline ? null : RT.session })
+        : rtPost('api/pipelines', { track: d.rtPipeline, request: task, ...opts });
       req.then(({ ok, j }) => {
         if (!ok) { toast(j.error || 'Request failed'); return; }
-        RT.pipeline = d.rtPipeline ? j.id : null; RT.session = j.session_id; RT.state = null;
-        audit('Runtime', d.rtRun ? 'agent.run' : 'pipeline.start', `${d.rtRun || d.rtPipeline}: ${task.slice(0, 80)}`);
+        RT.pipeline = (d.rtPipeline || scn) ? j.id : null; RT.session = j.session_id; RT.state = null;
+        audit('Runtime', scn ? 'scenario.start' : d.rtRun ? 'agent.run' : 'pipeline.start', `${scn || d.rtRun || d.rtPipeline}: ${task.slice(0, 80)}`);
         pollRuntime();
       });
     } else if (d.rtSign) {
