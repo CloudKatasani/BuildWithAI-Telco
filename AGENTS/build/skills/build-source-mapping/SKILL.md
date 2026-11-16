@@ -1,11 +1,11 @@
 ---
 name: build-source-mapping
-description: Produces the source-to-target mapping for a telco data product - source inventory across BSS, OSS and network systems, MAP-### rows to TM Forum SID entities, column classification with minimisation and lawful basis, ingestion pattern per table (CDC, batch, streaming), keys and DQ-### rules. Use after G1 is approved, when a new source or attribute is added, or when design, build or test returns a mapping defect.
+description: Produces the source inventory and the source-to-target mapping for a telco data product - MAP rows to TM Forum SID entities with evidence and confidence, classification and minimisation per column, ingestion pattern per table, keys and change handling, and DQ rules - and requests G2. Use after requirements exist, when a source or attribute is added, or when design, build or test returns a mapping or rule defect.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, list_source_metadata, profile_column, lookup_sid, lookup_glossary, ask_open_question and request_gate tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: mapping-analyst
   gate: G2
@@ -17,140 +17,132 @@ metadata:
 
 ## Mission
 
-Show exactly where every required attribute comes from, which SID entity it belongs to,
-how sensitive it is and how it should arrive, so design and code need no guessing.
+Show where every required attribute comes from, which SID entity it belongs to, how sensitive it
+is and how it arrives, with evidence from metadata and profiles. The Data Steward and the Security
+& Privacy Officer approve at G2; design, build and test all work from these two files.
 
 ## Use when
 
-- G1 is approved and the requirements pack exists.
-- A new source (for example a TMF638 service inventory feed) or attribute is added.
-- A later stage returns a mapping, classification or ingestion defect.
+- Requirements exist and need sources, classification and quality rules.
+- A source system, table or attribute is added or renamed.
+- A later stage returns a mapping row or a DQ rule as wrong.
 
-## Do not use for
-
-- Choosing layers, table types or platforms (Solution Architect).
-- Writing ingestion configs or dbt models (Data Engineer).
-- Redefining a business rule (return it to the Business Analyst).
+Not for: defining rules or thresholds (build-business-analyst); physical tables, load patterns in
+the target or cost (build-solution-architect); catalog and lineage evidence
+(build-governance-lineage).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| `01-requirements/*` with G1 approval | yes |
-| Source metadata: Oracle/Db2 BSS, OSS PM, CDR/xDR lake, mediation, OCS, TMF621, TMF638/639 | yes |
-| `control/domain-pack.yaml` classification, retention and lawful-basis rules | yes |
-| Existing catalog tags and lineage | if available |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| `BR`, `NFR`, `CQ` to satisfy | `read_artifact` on `01-requirements/requirements.md` | Derive the needed attributes from the brief or the task text and mark every `MAP` row `assumption` (owner Data Product Owner) |
+| Systems, owners, tables, columns, classification, ingestion pattern, row counts | `list_source_metadata` | A needed attribute has no column: record a gap with options and ask the source owner named in metadata; do not pick a look-alike column |
+| Null rate, distinct count, lengths, top values | `profile_column` | The tool returns an error: keep the row at `low` confidence and note "not profiled" with the reason |
+| SID entity and TMF Open API | `lookup_sid` | No match: use the domain pack table; if still unclear, ask the Data Steward (non-blocking) |
+| Business term definitions | `lookup_glossary` | No match: map on the requirement's wording and list a glossary gap |
+| DQ thresholds and severities | Requirements, team standards in attached context | Propose a rule with the measured value as evidence, label the threshold `assumption`, owner Data Steward |
 
-Reject the handoff if any `BR-###` lacks an acceptance criterion.
+## Workflow
 
-## Tasks
-
-1. **Inventory sources.** With `list_source_metadata`, list system, table, owner, system
-   of record, refresh pattern, row count, change volume and access status per table.
-2. **Profile with statistics.** Use `profile_column` for null rate, distinct count, length
-   and patterns. For Restricted columns accept statistics only; the tool refuses values.
-3. **Anchor to SID.** Use `lookup_sid` to place each target attribute in a SID entity
-   (Customer, Party, Product, Service, Resource, Usage, Bill) and note the TMF Open API
-   (TMF629, TMF637, TMF638, TMF639, TMF621, TMF632) where the source follows one.
-4. **Map.** One `MAP-###` row per target attribute: source `system.object.field`, rule type
-   (direct, derived, lookup, aggregate, default), transformation in plain language, null
-   handling, `BR-###`, confidence, evidence. Check names with `lookup_glossary`.
-5. **Classify.** Every source and target column gets a class. MSISDN, IMSI, IMEI, cell
-   location, call records and KYC fields are Restricted personal data; state direct or
-   indirect identifier and the lawful basis.
-6. **Minimise.** For each Restricted column state keep, pseudonymise (keyed hash), truncate
-   (cell to cluster), aggregate or drop, and the requirement that justifies keeping it.
-7. **Set ingestion pattern per table.** CDC (GoldenGate) for mutable BSS tables, batch
-   framework for daily API or file extracts, Kafka streaming for 15-minute PM counters
-   and alarms, lake registration for Iceberg CDR/xDR. State the reason and latency need.
-8. **Define keys and change handling.** Business keys, joins, cardinality, late and
-   duplicate CDR handling, and what a source delete means in the target.
-9. **Write DQ rules.** `DQ-###` per critical attribute with threshold, severity (block,
-   warn) and the requirement it protects. Thresholds come from the steward.
-10. **List gaps** with options and owners; raise blocking ones with `ask_open_question`.
-11. **Request G2** with `request_gate`, listing the mapping pack, then stop.
+- Inventory with `list_source_metadata`: one line per column of every table in scope, including
+  columns you decide not to use, so approvers see what was left out and why.
+- Profile key, join and rule-bearing columns with `profile_column`. For Restricted columns the tool
+  returns counts and lengths only; that is enough for key and completeness evidence.
+- Write one `MAP` row per target attribute and the keys, joins and change handling per table.
+- Classify and minimise every column; set the ingestion pattern per table.
+- Write `DQ` rules, each tied to the `BR` or `NFR` it protects.
+- Check the pack against the requirements: every attribute a `BR` or `CQ` needs has a `MAP` row or a
+  gap; every mapped attribute is needed by something (otherwise drop it, TEL-C1).
+- Write both artifacts, raise gaps with `ask_open_question`, call `request_gate` listing both files
+  and stop. This role has no decision-log tool, so decisions for approvers go in a section of
+  `mapping.md`.
 
 ## Decision rules
 
-- One system of record per attribute. If billing and CRM disagree, document both and ask
-  the Data Steward.
-- A name-only match is `confidence: low` and needs steward confirmation before G2.
-- A derivation without a `BR-###` is an invented rule: stop and raise it.
-- Unknown classification is Restricted until the steward says otherwise.
-- PM counters keep the 3GPP TS 28.552 counter name and the 15-minute granularity period
-  in the mapping; a counter without a measured object (cell, carrier) is a gap.
-- Timestamps state their zone. CDR event time and file arrival time are mapped separately.
-- CDC for a table with fewer than one change per day per thousand rows may be batch;
-  record the choice and let the architect confirm.
+- One system of record per attribute. If two systems carry it, document both and ask the Data
+  Steward; picking one silently hides a reconciliation problem.
+- Confidence follows evidence: a name-only match is `low`; metadata description plus profile is
+  `medium`; a requirement-cited rule confirmed by profile is `high`.
+- A derivation with no `BR` is a gap for the Business Analyst, not a rule to invent here.
+- Classification comes from metadata and is never lowered here. A derived attribute inherits the
+  strictest class of its inputs. The same column name can differ by table: `cell_id` is Restricted
+  in `xdr_daily` (a subscriber's location) and Internal in `pm_cell_kpi` (a network element).
+- Each Restricted column gets one of keep, pseudonymise, truncate (cell to cluster), aggregate or
+  drop, with the requirement that justifies anything other than drop. Subscriber joins use the
+  pseudonymous key (TEL-C4).
+- Take the ingestion pattern from metadata and state the latency need. Propose a different pattern
+  only with a reason; the Solution Architect decides.
+- Usage records: map event time and arrival time separately, name the dedupe key, and say what a
+  late record and a source delete mean in the target. PM counters keep their granularity period.
+- Write `DQ` rules so they can be executed. The DQ runner supports `not_null`, `unique`, `min_value`
+  and `allowed_values`; anything else is written as a plain-language check for sandbox SQL. Build
+  `allowed_values` lists from the metadata description and the profiled values together.
+- Transformations are plain language, not SQL, because the dialect is chosen at G3.
+- A column renamed at source is mapped under its current name with the old name and the release
+  note id recorded, so an unannounced rename can be traced later.
 
-## Do not
+## Escalate to a person when
 
-- Read, paste or log any MSISDN, IMSI, IMEI, account number or location value.
-- Write SQL or engine-specific functions into mapping files.
-- Profile production outside the windows in the stack profile.
-- Request access or assume access will be granted.
-
-## Escalate to the human when
-
-- A requirement needs Restricted data with no lawful basis in the domain pack.
-- Source ownership is unknown or two systems claim to be the record.
-- Profiling shows quality too poor to meet an acceptance criterion.
-- CDR retention in the source is shorter than the history the requirements need.
-
-## Enterprise controls
-
-- Every Restricted column has a masking or minimisation decision before G2.
-- Lineage at column level is recorded for every Confidential and Restricted attribute.
-- Each source records owner, steward, storage region and retention.
-- Profiling uses the read-only service identity within row and time caps.
-
-## Self-review before handover
-
-- *Accuracy.* Every in-scope attribute has one mapping or one gap, every mapping serves a
-  requirement, and every derivation cites a `BR-###`.
-- *Risk.* Every column is classified, every Restricted column has a minimisation
-  decision, and no raw value appears in any file.
-- *Handover.* The architect can read SID entity, keys, change handling and ingestion
-  pattern per table without opening a source system.
+- A requirement needs a Restricted column kept in clear, or location below cluster level: Security &
+  Privacy Officer, blocking for that row.
+- Ownership is unknown or two systems claim to be the record: Data Steward.
+- A profile shows quality too poor to meet an acceptance criterion: Data Steward and the source
+  owner.
+- Source history is shorter than a requirement needs, or longer than TEL-C2 allows: Security &
+  Privacy Officer.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Source inventory | `02-mapping/source-inventory.md` | System, table, owner, record system, refresh, access |
-| Profile summary | `02-mapping/profile-summary.md` | Statistics and anomalies, no raw values |
-| Mapping | `02-mapping/source-to-target.csv` | `MAP-###` rows with SID entity, rule, confidence |
-| Classification | `02-mapping/classification.csv` | Class, identifier kind, lawful basis, minimisation |
-| Ingestion patterns | `02-mapping/ingestion-patterns.md` | CDC, batch or streaming per table with reason |
-| Keys and changes | `02-mapping/keys-and-relationships.md` | Keys, joins, deletes, late and duplicate handling |
-| DQ rules | `02-mapping/dq-rules.csv` | `DQ-###` with threshold, severity, requirement |
-| Gaps | `02-mapping/gaps.md` | Gap, options, owner |
+| Source inventory | `02-mapping/source-inventory.csv` | `system,table,column,type,key,classification,ingest,owner,rows,used_by,minimisation` |
+| Mapping | `02-mapping/mapping.md` | `MAP` rows, keys and change handling, `DQ` rules, gaps, decisions for approvers |
+
+```markdown
+## Mapping rows
+| ID | Target attribute | SID entity (TMF API) | Source system.table.column | Rule type | Transformation | Null handling | BR/NFR | Class | Confidence | Evidence |
+## Keys and change handling
+| Table | Business key | Joins to | Ingestion | Late / duplicate / delete handling |
+## DQ rules
+| ID | Table.column | Check | Value | Severity (block / warn) | Protects | Threshold source |
+## Gaps and options / Decisions for approvers
+```
 
 ## Definition of done
 
-1. Every target attribute has exactly one approved mapping or a recorded gap.
-2. Every column is classified; every Restricted column has a minimisation decision.
-3. Every source table has an ingestion pattern with a reason.
-4. No `low` confidence row remains unconfirmed.
-5. G2 approved by the Data Steward and the Security & Privacy Officer.
+- [ ] Every attribute a `BR` or `CQ` needs has a `MAP` row or a gap with options and an owner.
+- [ ] Every `MAP` row cites a metadata or profile result; no row rests on a column name alone above
+      `low` confidence.
+- [ ] Every column in scope has a class and a minimisation decision; no Restricted value appears.
+- [ ] Every `DQ` rule names its check type, value, severity and the requirement it protects.
+- [ ] The Solution Architect can design from the two files without opening a source; G2 was
+      requested on both.
 
 ## Worked example
 
-Fraud signals run, attribute `sim_key` for `BR-01` (SIM-box candidate per SIM per day).
-`MAP-007`: source `voice_cdr.calling_imsi` (CDR lake, Iceberg), SID entity Resource
-(SIM) via Usage, rule derived: keyed hash of IMSI with the fraud-domain key, class
-Restricted / direct identifier pseudonymised, lawful basis fraud prevention, confidence
-high, evidence: metadata and `profile_column` null rate 0.02%. Ingestion: lake
-registration, 15-minute files. `DQ-011`: IMSI present on every CDR, block below 99.9%.
-Rejected: map `kyc_record.msisdn` into the gold fraud table so analysts can call the SIM.
-Why: no requirement needs the MSISDN in gold; analysts resolve the pseudonymised key
-through the case tool under their own access, so the column is dropped.
+Churn run, requirements BR-001 to BR-003.
 
-## Common failure modes
+- `list_source_metadata` "billing": `billing_account.tariff_code`, "renamed from plan_code in
+  RN-772"; `status` described as ACTIVE, SUSPENDED, CLOSED; ingestion CDC (GoldenGate).
+- `profile_column` `billing_account.status`: 6,000 rows, null rate 0, top values ACTIVE 5,423,
+  SUSPENDED 577. `profile_column` `crm_customer.msisdn`: Restricted, 6,000 distinct, length 17,
+  no values returned.
+- MAP-001 `subscriber_key` from `xdr_lake.xdr_daily.subscriber_key`, direct, Usage (TMF635), high.
+- MAP-002 `tariff_code` from `billing.billing_account.tariff_code`, direct, ProductOffering
+  (TMF620), medium; note "was plan_code before RN-772".
+- `msisdn`, `full_name`, `date_of_birth`: drop (no rule needs them). `xdr_daily.cell_id`: drop.
+- DQ-004 `billing_account.status` `allowed_values` ACTIVE,SUSPENDED,CLOSED, block, protects BR-002.
 
-| Failure | Prevention |
+Rejected: DQ-004 with ACTIVE,CLOSED only, because BR-001 talks about active and closed lines.
+Why: the profile shows 577 SUSPENDED rows and metadata lists it as valid; the rule would fail on
+good data and be returned from test as a rule defect.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Location kept at cell level by default | Minimisation decision per Restricted column |
-| Name-match mappings accepted as fact | Confidence field plus steward confirmation |
-| Streaming chosen for a daily need | Pattern tied to a stated latency |
-| Profiling leaks identifiers | Statistics only for Restricted columns |
+| Map an attribute to a column because the names match | Profile it, read its description, and set `low` confidence until the Data Steward confirms |
+| Keep `msisdn` "in case a consumer needs it" | Drop it; a later need comes back as a requirement with a lawful basis |
+| Treat `cell_id` the same in every table | Read the class per table; subscriber location is Restricted, cell inventory is Internal |
+| Write an `allowed_values` list from the requirement text alone | Combine the metadata description with the profiled top values |
+| Guess a source for an attribute with no column | Record the gap with options and ask the source owner |

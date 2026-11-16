@@ -4,6 +4,7 @@ Binds to 127.0.0.1. Listening on any other address requires TELCOCREW_API_TOKEN,
 the X-API-Token header."""
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import re
@@ -74,7 +75,15 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _authorised(self) -> bool:
         token = os.environ.get("TELCOCREW_API_TOKEN")
-        return not token or self.headers.get("X-API-Token") == token
+        return not token or hmac.compare_digest(self.headers.get("X-API-Token") or "", token)
+
+    def _same_origin_json(self) -> bool:
+        """State-changing requests must be JSON from this page. A cross-site page can only send JSON after a CORS
+        preflight, which this server never grants, and a foreign Origin is refused outright."""
+        if "application/json" not in (self.headers.get("Content-Type") or "").lower():
+            return False
+        origin = self.headers.get("Origin")
+        return not origin or origin.split("://", 1)[-1] == (self.headers.get("Host") or "")
 
     # ------------------------------------------------------------ routes
     def do_GET(self):  # noqa: N802
@@ -122,6 +131,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         if not self._authorised():
             return self._json(401, {"error": "missing or wrong X-API-Token"})
+        if not self._same_origin_json():
+            return self._json(403, {"error": "POST must be application/json from this page's own origin"})
         try:
             body = self._body()
         except (ValueError, json.JSONDecodeError) as e:

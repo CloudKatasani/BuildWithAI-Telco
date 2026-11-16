@@ -5,7 +5,7 @@ license: Proprietary
 compatibility: Runtime-neutral. The telcocrew runtime enforces the rules marked (enforced).
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   scope: all-agents
   precedence: overrides-track-skills
 ---
@@ -86,6 +86,12 @@ Every fact comes from, in this order: an approved upstream artifact; context a p
 the telco domain pack; a tool result you obtained. General knowledge is for method only, never the
 source of an operator fact (a threshold, a tariff, an owner, a KPI target). If a fact is missing,
 raise it with `ask_open_question` naming the role who can answer and whether it blocks.
+
+- **Generated is not executed.** Code, configuration and plans you wrote are "generated". Say "executed",
+  "tested" or "verified" only for what a tool result shows, and cite it. A result you expected but did not
+  obtain is reported as not run, with the reason, because approvers sign on the evidence you describe.
+- **Missing input.** When something your skill expects is absent, use the fallback the skill gives for it.
+  Stop only when continuing would be unsafe or everything useful depends on it.
 
 ## 8. Identifiers, confidence and labels
 

@@ -42,8 +42,10 @@ Each agent's system prompt is: its definition body, then `telco-shared-guardrail
 | Action classes A0–A4: a tool above the agent's `max_action_class` is refused; A4 is never proposed or run | `tools.run_tool`, `guardrails.class_allowed` |
 | Approvals bound to a SHA-256 of the content; execution and publication need a fully signed approval for the same content | `guardrails.ApprovalStore` |
 | Named people only; agents never sign; one person cannot sign two roles; A3 needs two approvers | `ApprovalStore.sign/request` |
-| One writer per folder: an agent writes only inside its `workspace` | `write_artifact` |
-| Restricted telco data: MSISDN, IMSI/IMEI, names never selectable; profiling returns counts only; groups under 10 subscribers suppressed | `run_sandbox_sql`, `profile_column`, `query_metric` |
+| One writer per folder: a write outside the agent's `workspace`, or a path that climbs out of it, is refused | `write_artifact` |
+| A gated stage cannot pass silently: if a live agent ends without requesting its gate the runtime raises it; a failed or empty stage stops the pipeline | `workflows.Pipeline` |
+| The local API accepts state-changing requests only as JSON from its own origin | `server.Handler` |
+| Restricted telco data: an SQLite authorizer returns Restricted columns as NULL however the SQL is written and denies anything but reads; profiling returns counts only; groups under 10 subscribers suppressed | `data.query_sandbox`, `profile_column`, `query_metric` |
 | Redaction of phone numbers, IMSI/IMEI, emails, cards and keys before any model call | `guardrails.redact` |
 | Prompt-injection text in alarms or tickets flagged and treated as data | `guardrails.scan_injection` |
 | Append-only, hash-chained audit log | `guardrails.AuditLog` |
@@ -115,6 +117,25 @@ The server listens on localhost only unless `TELCOCREW_API_TOKEN` is set (client
 API: `GET /api/agents`, `GET /api/agents/<id>`, `POST /api/agents/<id>/run {task, mode?, session_id?}`,
 `POST /api/pipelines {track, request, mode?}`, `GET /api/pipelines/<id>`, `GET /api/sessions/<id>`,
 `GET /api/approvals`, `POST /api/approvals/<id>/decide {role, decision: approve|changes|reject, comment}`.
+
+## Evals and tuning the skills
+
+`evals/cases.yaml` holds behaviour cases for every agent: a task, upstream setup, and what must be
+true afterwards (tools called, approval requests and their roles, artifacts written, text that must
+or must not appear, nothing executed). Every case also fails if a fake personal identifier reaches
+the output. Each case carries a rubric for a Claude judge or a human reviewer.
+
+```bash
+python -m telcocrew eval                                   # simulator: proves the harness and the guardrails
+python -m telcocrew eval --mode live                       # live: measures the skills on Claude
+python -m telcocrew eval --mode live --track operate --judge
+python -m telcocrew eval --mode live --model claude-haiku-5-5   # do the skills hold on a smaller model?
+```
+
+Results and per-case transcripts go to `artifacts/EVAL-<timestamp>/`. To tune a skill: run its
+cases live, read the failing transcript, change the skill (one rule, with its reason), and rerun.
+Add a case for every behaviour you fix so it stays fixed. The review that produced the current
+skills is in [../docs/SKILL_TUNING_REVIEW.md](../docs/SKILL_TUNING_REVIEW.md).
 
 ## Tests
 

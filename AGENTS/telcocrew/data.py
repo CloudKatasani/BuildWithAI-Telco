@@ -328,6 +328,32 @@ def query(sql: str, params: tuple = ()) -> tuple[list[str], list[tuple]]:
         return [d[0] for d in cur.description or []], cur.fetchall()
 
 
+def query_sandbox(sql: str, cap: int = 200) -> tuple[list[str], list[tuple], bool]:
+    """Run agent-written SQL under an SQLite authorizer: reads only, and Restricted columns come back as
+    NULL however the statement is written (aliases, c.*, sub-queries, CTE column lists)."""
+    restricted = {(t, c) for s in SOURCES.values() for t, spec in s["tables"].items()
+                  for c, v in spec["columns"].items() if v[2] == "Restricted"}
+    allowed = {sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ, sqlite3.SQLITE_FUNCTION, sqlite3.SQLITE_RECURSIVE}
+
+    def authorizer(action, arg1, arg2, dbname, source):
+        if action not in allowed:
+            return sqlite3.SQLITE_DENY
+        if action == sqlite3.SQLITE_READ and (arg1, arg2) in restricted:
+            return sqlite3.SQLITE_IGNORE
+        return sqlite3.SQLITE_OK
+
+    with _lock:
+        conn = _conn or db()
+        conn.set_authorizer(authorizer)
+        try:
+            cur = conn.execute(sql)
+            cols = [d[0] for d in cur.description or []]
+            rows = cur.fetchmany(cap + 1)
+        finally:
+            conn.set_authorizer(None)
+    return cols, rows[:cap], len(rows) > cap
+
+
 def classification_of(table: str, column: str) -> str:
     for s in SOURCES.values():
         if table in s["tables"]:

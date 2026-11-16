@@ -6,6 +6,8 @@ import threading
 import uuid
 from dataclasses import dataclass, field
 
+from .guardrails import sha
+from .registry import get_agent
 from .runner import run_agent
 from .tools import Session
 
@@ -63,6 +65,31 @@ class Pipeline:
         res = run_agent(agent_id, self._task_for(agent_id, comment), self.session, self.mode, self.context, self.model, self.effort)
         self._seen[agent_id] = self._seen.get(agent_id, 0) + 1
         new = [a for a in self.session.approvals.items if a not in before]
+        if res.status == "blocked":      # a model or runtime failure never passes a stage silently
+            self.results.append({"step": self.idx, "agent": agent_id, "status": "blocked", "approvals": new, "final": res.final})
+            self.status = "stopped"
+            self.session.emit("blocked", "runtime", f"{agent_id} could not finish ({res.final[:160]}). Pipeline stopped at this step.")
+            return
+        agent = get_agent(agent_id)
+        gate_open = any(a.content.get("gate") == agent.gate and a.status in ("pending", "approved")
+                        for a in self.session.approvals.items.values()) if agent.gate else True
+        if agent.gate and not gate_open:
+            # The stage ended without asking for its gate. People still decide: the runtime raises the request itself,
+            # bound to everything the agent wrote, and says so.
+            mine = {p: sha(c) for p, c in self.session.artifacts.items() if p.startswith(agent.workspace)}
+            if not mine:
+                self.results.append({"step": self.idx, "agent": agent_id, "status": "blocked", "approvals": new, "final": res.final})
+                self.status = "stopped"
+                self.session.emit("blocked", "runtime", f"{agent_id} produced no artifacts and requested no gate. Pipeline stopped.")
+                return
+            ap = self.session.approvals.request(
+                kind="gate", title=f"{agent.gate} - {agent.title.replace(' Agent', '')}", requested_by=agent_id,
+                action_class="A3" if len(set(agent.approvers)) > 1 else "A2", approvers=agent.approvers, run_id=self.session.id,
+                content={"gate": agent.gate, "summary": "Raised by the runtime: the agent finished without requesting its gate.",
+                         "risks": "Review the handoff for anything the agent left open.", "artifacts": mine})
+            new.append(ap.id)
+            self.session.emit("gate", "runtime", f"{agent_id} did not request {agent.gate}; the runtime raised {ap.id} for "
+                                                 f"{', '.join(agent.approvers)}", approval_id=ap.id)
         if agent_id == "operate-problem-knowledge":
             ke = [p for p in self.session.artifacts if p.startswith("ops/problem/")]
             if ke:   # the runtime asks the Problem Manager to approve the known-error entry the agent drafted
