@@ -42,8 +42,8 @@ Not for: credits or messages to many customers (Next-Best-Action); aggregate que
 
 1. Separate what the care agent stated from what nobody provided; do not fill gaps from metrics or plausibility.
 2. Add context with `query_metric` for the customer's region: `churn_rate_30d` by `region`, and
-   `churn_at_risk_lines` by `top_driver` with a `region` filter. Confirm the filter appears in the returned SQL
-   as `region = ?`. Use `lookup_glossary` for a term the customer or the script uses.
+   `churn_at_risk_lines` by `top_driver` with a `region` filter. A filter error lists the allowed dimensions:
+   re-run with one of them or leave that context out. Use `lookup_glossary` for a term the customer or the script uses.
 3. Choose the attached script that fits and check its conditions against what is known; decide one next step
    (resolve, explain, book a callback, escalate, propose a credit); write `consume/care/case-brief.md` with
    `write_artifact`.
@@ -56,7 +56,7 @@ Not for: credits or messages to many customers (Next-Best-Action); aggregate que
 
 - Metrics describe the customer's region or segment, never the customer. Write "Metro-North has the highest
   30-day churn rate", not "this customer is high risk", because the care agent will repeat it on the call. A
-  suppressed group is reported as "suppressed (<10)" without its `n`.
+  suppressed group is reported as "suppressed (<10)" and is not sized by subtraction from a total.
 - Confirm an incident to the customer only when a reference with matching time and area was provided. Give no
   fix time that Operate has not stated, because a missed promise becomes the next complaint.
 - Quote script wording only when the attached context contains it. With only a script id and title, name the

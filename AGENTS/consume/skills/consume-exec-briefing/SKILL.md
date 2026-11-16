@@ -42,7 +42,7 @@ Not for: a single question (Ask-Your-Data); finding drivers (Insight Scout); siz
 1. List the workspace with `read_artifact` and read last week's brief, insight cards and proposals if present.
    A fresh workspace is normal; the brief is then built from metrics alone and says so.
 2. Query every steering metric with `query_metric`, total first and then by the dimension that shows where it
-   sits. Check freshness on each result; confirm any filter appears in the returned SQL as `<dimension> = ?`.
+   sits. Check freshness on each result; on a filter error re-run with a dimension from `allowed_dimensions`.
 3. Attach reasons and decisions only from the artifacts read in step 1, at their stated confidence.
 4. Write the headline last (the two or three lines with the most value at stake), then write
    `consume/briefings/week-<nn>.md` with `write_artifact`; `<nn>` is the ISO week of the freshness date unless
@@ -65,7 +65,7 @@ Not for: a single question (Ask-Your-Data); finding drivers (Insight Scout); siz
 - Decisions needed list pending proposals with ACT id, value as an estimate, approvers and approval id, as
   pending. The brief does not recommend approval or create proposals; a decision with no proposal is phrased
   as a question for a named role and pointed to Next-Best-Action.
-- Suppressed groups appear as "suppressed (<10)" without their `n`. Accounts appear as counts and totals, by
+- Suppressed groups appear as "suppressed (<10)" and are not sized by subtraction. Accounts appear as counts and totals, by
   name only where a decision depends on it. The body fits one page: bad news stays, detail goes to the appendix.
 
 ## Escalate to a person when
@@ -87,7 +87,7 @@ Not for: a single question (Ask-Your-Data); finding drivers (Insight Scout); siz
 | Commercial | <value or ordering> | <prior period | snapshot> | <reason | reason not established> | <metric> |
 **Decisions needed:** <ACT id, action, value (estimate), approvers, approval id, pending> | <question, role, no proposal yet>
 **Gaps:** <domains with no certified metric; stale or missing lines; what was not provided>
-**Appendix:** per figure: metric, SQL, filter values, lineage, freshness; arithmetic for each estimate
+**Appendix:** per figure: metric, SQL, lineage, freshness; arithmetic for each estimate
 ```
 
 ## Definition of done

@@ -41,8 +41,8 @@ cause of a live fault (Operate Diagnosis and RCA); the steering summary (Exec Br
 
 1. Fix the scope with `list_metrics`; list the workspace with `read_artifact` (a fresh workspace is normal).
 2. Query each metric with `query_metric`, first ungrouped, then by each allowed dimension. Check freshness and
-   `ignored_dimensions`; confirm each filter appears in the returned SQL as `<dimension> = ?`, because a filter
-   on a key that is not an allowed dimension is dropped without notice.
+   `ignored_dimensions`; a filter on a key that is not an allowed dimension returns an error with
+   `allowed_dimensions`, so re-run with one of them or list the cut under "not scanned".
 3. Locate the finding (which groups carry it, and whether it survives normalisation and suppression), then
    test each candidate driver with the data available and grade it shown, suggested or not testable.
 4. Write all cards and the digest to `consume/insights/weekly.md` with `write_artifact`; log dropped or
@@ -55,7 +55,7 @@ cause of a live fault (Operate Diagnosis and RCA); the steering summary (Exec Br
   snapshot only, so without a baseline the finding is a concentration ("highest in", "share of") and says so.
 - Normalise before calling a group high: regions differ in size. `churn_rate_30d` rows carry `n`, the line base
   per group, so a share is at-risk lines divided by that base, with the arithmetic shown and labelled derived.
-- A suppressed group cannot carry a finding: name it as "suppressed (<10)" and do not quote its `n` or rebuild
+- A suppressed group cannot carry a finding: name it as "suppressed (<10)" and do not rebuild
   it by subtraction, because that re-identifies a small group.
 - `top_driver` is the churn model's leading feature per line (lineage: churn_gbm v7). It supports "associated
   with". A risk score is also not churn: use `churn_rate_30d` for churn itself.
@@ -87,7 +87,7 @@ cause of a live fault (Operate Diagnosis and RCA); the steering summary (Exec Br
 - Drivers: <driver> - shown | suggested | not testable - <evidence>
 - Operate link: <INC id: what matches, what does not> | none provided
 - Value at stake: <metric and value> | Confidence: high | medium | low (<who must confirm>)
-- Evidence: <metric names, SQL, filter values, lineage, freshness>
+- Evidence: <metric names, SQL, lineage, freshness>
 - Open questions: <question, role, blocking or not>
 ```
 

@@ -42,8 +42,8 @@ Enterprise Account); incident response or executing a network change (Operate Re
 
 1. Confirm the finding. A `low` card, or a claim the data does not support, stops here with the evidence needed.
 2. Choose one action type per proposal and define the audience as a filter on certified dimensions. Size it
-   and its value with `query_metric`; confirm each filter appears in the returned SQL as `<dimension> = ?`,
-   because a filter on a key that is not an allowed dimension is dropped without notice.
+   and its value with `query_metric`. A filter on a key that is not an allowed dimension returns an error with
+   `allowed_dimensions`: redefine the audience on those, and move what cannot be filtered into `checks`.
 3. Work out expected value, holdout and checks; write `consume/actions/proposal.md` with `write_artifact`; log
    the options considered with `record_decision`.
 4. Create the approval request with `propose_business_action`, one call per action. Approvers see the call's
@@ -88,12 +88,12 @@ Audience: <filter on certified dimensions> = <n> lines (before consent)   Holdou
 Offer: <terms> (band <...> from <policy source>)
 Expected value (estimate): <formula, each input labelled fact | policy | assumption> = <result>; break-even <rate>
 Checks: consent_marketing = 'Y' at selection; <exclusions>; <measurement against holdout>
-Evidence: <metric names, SQL, filter values, lineage>   Open questions: <...>
+Evidence: <metric names, SQL, lineage>   Open questions: <...>
 ```
 
 ## Definition of done
 
-- [ ] Audience and value figures come from `query_metric` results of this run, filters confirmed in the SQL.
+- [ ] Audience and value figures come from `query_metric` results of this run, with the SQL as returned.
 - [ ] Every expected-value input is labelled fact, policy or assumption, and the arithmetic reproduces the result.
 - [ ] Consent check, holdout, discount band and measurement method are stated, or their absence is explained.
 - [ ] One approval request per action, with the matching `action_type`; the proposal says nothing was executed.
@@ -104,7 +104,7 @@ Request: "Churn risk jumped in Metro-North after the network incident. Propose a
 high-value, consented lines." Attached: offer policy (band 10-20% for 6 months, holdout 10%), team standards.
 - `query_metric(metric="churn_at_risk_lines", filters={"region": "Metro-North", "value_segment": "High"})`: one
   group, above the suppression limit; `at_risk_arpu` with the same filters gives the monthly ARPU sum and `n`.
-  A `consent_marketing` filter would be dropped silently, so this is the audience before consent: STD-05 goes
+  A `consent_marketing` filter returns an error (not a dimension), so this is the audience before consent: STD-05 goes
   into `checks` and a non-blocking question goes to the Data Steward.
 - By `top_driver` the dropped-calls group in Metro-North is suppressed (<10), so the proposal rests on the
   concentration of risk, not on the incident. ACT-001: 15% for 6 months, 10% holdout, illustrative save rate

@@ -41,8 +41,8 @@ a circuit or router fault (Operate Diagnosis and RCA); the steering summary (Exe
 ## Workflow
 
 1. Query `sla_credit_exposure_eur` by `account` and `accounts_breach_forecast` for the scope. For one account
-   use `filters={"account": "<name>"}` and confirm the returned SQL contains `account = ?`, because a filter on
-   a key that is not an allowed dimension is dropped without notice and would return the portfolio total.
+   use `filters={"account": "<name>"}` with the name exactly as the grouped result returns it. A filter on a
+   key that is not an allowed dimension returns an error with `allowed_dimensions`; re-run with one of them.
 2. Place the account in its portfolio: rank by exposure and share of total, with the arithmetic shown.
 3. Read lineage with `get_lineage` on `gld_account_sla` when the brief will be challenged on where a figure
    comes from; note whether it is complete.
@@ -88,13 +88,13 @@ a circuit or router fault (Operate Diagnosis and RCA); the steering summary (Exe
 **Not available:** <availability, target, tickets, contract terms, renewal date: what is missing and who was asked>
 **Shared causes:** <INC id and element from an Operate artifact> | none provided
 **Talking points:** <three at most, each tied to a figure above>
-**Evidence:** <metric names, SQL, filter values, lineage, freshness>
+**Evidence:** <metric names, SQL, lineage, freshness>
 **Open questions and pending approvals:** <question, role, blocking or not; approval ids>
 ```
 
 ## Definition of done
 
-- [ ] Every figure comes from a `query_metric` result of this run, filters confirmed in the SQL.
+- [ ] Every figure comes from a `query_metric` result of this run, with the SQL as returned.
 - [ ] Exposure is worded "if the month closed now"; no credit, fix date or cause is promised.
 - [ ] Availability, contract, ticket and renewal detail is either from attached context or marked "not available".
 - [ ] Customer-facing text exists only as a draft with its approval id; open questions name a role.
@@ -105,7 +105,7 @@ Request: "Prepare me for the November service review with Northwind Logistics." 
 - `query_metric(metric="sla_credit_exposure_eur", group_by=["account"])`: Northwind Logistics has the largest
   exposure, then Contoso Health; Woodgrove Bank has none. Share of total computed from these rows.
 - `query_metric(metric="accounts_breach_forecast", filters={"account": "Northwind Logistics"})`: forecast to
-  breach; the SQL contains `account = ?`. Ungrouped, the metric shows most accounts forecast to breach.
+  breach; the SQL contains `account = 'Northwind Logistics'`. Ungrouped, the metric shows most accounts forecast to breach.
 - `lookup_glossary("availability")` gives the definition; availability month to date and the SLA target are
   not certified metrics, so they are "not available" with a question to the Data Product Owner.
 - Brief written. `draft_message(audience="enterprise customer: Northwind Logistics", ...)` for a review

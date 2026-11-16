@@ -107,8 +107,8 @@ design-time cost estimates (Build Solution Architect Agent); service metrics (Se
   and cells with enterprise services; sleep 01:00 to 05:00", blast_radius="About 40 low-traffic cells at
   night; neighbours carry the traffic", rollback="Wake the cells and restore the previous schedule",
   verify="Neighbour DCR < 1.5% each night; idle_night_kwh lower on pilot cells after 7 nights",
-  change_record="to be raised by the Change Manager (CAB)", approvers=["NOC Shift Lead", "Change Manager
-  (CAB)"])` -> `APR-91ab03d7`, pending. Saving: not quantified, the pilot measures it.
+  change_record="to be raised by CAB", approvers=["NOC Shift Lead", "Change Manager (CAB)"])` ->
+  `APR-91ab03d7`, pending. Saving: not quantified, the pilot measures it.
 
 Rejected: propose sleep mode on all 412 candidate cells to close the 3,200 EUR gap this month.
 Why: the candidate flag comes from energy data, not coverage; an untested change on 412 cells risks an outage that costs more than the gap.

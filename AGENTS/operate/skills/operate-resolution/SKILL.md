@@ -108,8 +108,8 @@ INC-90311. RCA: H1 CR-48213, `high`; KE-2207 fix "roll back offset from stored c
 - First invocation: `propose_action(title="Roll back CR-48213 on 14 MN-07 cells from stored config",
   action_class="A3", steps="Re-apply the previous offset in waves of 5 cells; check DCR after each",
   blast_radius="14 cells, about 41,000 subscribers; emergency coverage unconfirmed", rollback="Re-apply
-  CR-48213", verify="Cluster DCR < 1.2% within 15 min", change_record="to be raised by the Change Manager
-  (CAB)", approvers=["NOC Shift Lead", "Change Manager (CAB)"])` -> `APR-3f9a12c0`, pending. Plan written; stop.
+  CR-48213", verify="Cluster DCR < 1.2% within 15 min", change_record="to be raised by CAB",
+  approvers=["NOC Shift Lead", "Change Manager (CAB)"])` -> `APR-3f9a12c0`, pending. Plan written; stop.
 - Second invocation: `execute_approved_action(approval_id="APR-3f9a12c0")` -> digital twin, "Verify step
   'Cluster DCR < 1.2% within 15 min' passed". Execution record written; handed to Comms.
 
