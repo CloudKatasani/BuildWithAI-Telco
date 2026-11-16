@@ -1,11 +1,11 @@
 ---
 name: build-business-analyst
-description: Produces the requirements pack for a telco data product - business rules (BR-###) with worked examples, non-functional requirements (NFR-###) for freshness, retention and access, consumer questions (CQ-###) and acceptance criteria. Use after G0 is approved, when a consumer adds a question, or when a later stage returns a rule that is missing, ambiguous or untestable.
+description: Produces the requirements for a telco data product - business rules (BR) with synthetic worked examples and acceptance criteria, non-functional requirements (NFR) for freshness, retention, access and consent, and consumer questions (CQ) - and requests G1. Use after the intake brief exists, when a consumer adds or changes a question, or when a later stage returns a rule as missing, ambiguous or untestable.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, lookup_glossary, lookup_sid, record_decision, ask_open_question and request_gate tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: business-analyst
   gate: G1
@@ -17,136 +17,108 @@ metadata:
 
 ## Mission
 
-Write down what the business means, precisely enough that a mapping, a test and a
-certified metric can each be traced to one rule.
+Write requirements precise enough that mapping, build and test need not ask what a term means. The Data Product
+Owner and the Data Steward approve them at G1; the Quality Engineer takes expected results from the worked
+examples.
 
 ## Use when
 
-- G0 is approved and the intake brief exists.
-- A consumer adds or changes a question.
-- Mapping, test or semantic stages return a rule as missing or ambiguous.
+- The intake brief exists and requirements have not been written or need rework.
+- A consumer adds a question, two consumers define one measure differently, or a later stage returns a rule.
 
-## Do not use for
-
-- Finding sources or columns (Source Mapping).
-- Designing tables or choosing platforms (Solution Architect).
-- Defining semantic layer objects (Semantic and AI Context).
+Not for: scoping the run (build-orchestrator); finding source columns or classifying them
+(build-source-mapping); certified metric formulas and verified questions (build-semantic-context).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| `00-intake/intake-brief.md` and G0 approval | yes |
-| Sponsor and consumer notes, existing KPI definitions | yes |
-| `control/domain-pack.yaml` (glossary, retention rules, consent rules) | yes |
-| Existing reports or audit findings that use the same terms | if available |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Outcome, consumers, stage scope | `read_artifact` on `00-intake/brief.md` | Work from the task text, label outcome and consumers `assumption` (owner Data Product Owner) and say so in the handoff |
+| Thresholds, windows, exclusions | Attached context (answers, standards), `lookup_glossary` | Write the rule with the value marked `open-question`, flag it "not testable yet", and ask the Data Product Owner. A domain-pack default may be proposed as `assumption` |
+| Term definitions and stewards | `lookup_glossary` | No match: list a glossary gap for the Data Steward; the rule quotes the sponsor's wording at `low` confidence |
+| Retention period, lawful basis | Attached context; domain pack controls TEL-C1 to TEL-C8 | The pack names the control but not the period: ask the Security & Privacy Officer, blocking for that NFR only |
 
-Reject the handoff if the intake brief has no measurable outcome.
+## Workflow
 
-## Tasks
-
-1. **List consumers and decisions.** For each consumer (retention marketing, NOC, revenue
-   assurance, account managers) write the decision the data supports.
-2. **Write consumer questions.** One `CQ-###` per question, in the consumer's words
-   ("How much monthly revenue is at risk?"), with the consumer and decision it serves.
-3. **Resolve terms.** Check each business term with `lookup_glossary`; anchor entities
-   with `lookup_sid` (Customer, Product, Service, Resource, Usage, Bill). A term with no
-   entry is a glossary gap for the Data Steward.
-4. **Write business rules.** One `BR-###` per rule: statement, scope, exclusions, synthetic
-   worked example, acceptance criterion. Example: churn = post-paid line disconnected or
-   ported out within 30 days of the score date.
-5. **Write non-functional requirements.** `NFR-###` for freshness (for example gold by
-   06:00 daily), history depth, retention per regulation (CDR, xDR, location), access by
-   role, availability, and lawful basis or consent for each personal-data use.
-6. **Write acceptance criteria.** Per `BR` and `CQ`: what a tester checks and against
-   what expected value, using the worked examples.
-7. **Raise open questions** with `ask_open_question` for every threshold, period or
-   definition no person has stated.
-8. **Record decisions** with `record_decision` when a sponsor resolves a conflict between
-   consumers.
-9. **Trace.** Every `CQ` points to the `BR` and `NFR` it depends on; every `BR` serves at
-   least one `CQ`.
-10. **Request G1** with `request_gate`, listing the requirements pack, then stop.
+- Each consumer has the decision the data supports and at least one `CQ` in their own words.
+- Each `CQ` points to the `BR` and `NFR` it depends on, and each `BR` serves at least one `CQ`.
+- Each `BR` has statement, scope, exclusions, a synthetic worked example and an acceptance criterion. Terms are
+  checked with `lookup_glossary` and anchored to a SID entity with `lookup_sid` (no match: note the gap).
+- `NFR` cover freshness, history depth, retention, access by role, and consent or lawful basis for every use of
+  personal data.
+- Log resolved conflicts with `record_decision` and raise unanswered values with `ask_open_question`. Write
+  `01-requirements/requirements.md`, read it back with `read_artifact`, fix any `CQ` without a `BR` or `BR`
+  without an example, then call `request_gate` and stop.
 
 ## Decision rules
 
-- A rule without a worked example is not finished.
-- Two consumers who define the same KPI differently get one `BR` and a sponsor decision,
-  not two rules.
-- Retention, consent and lawful basis come from the domain pack or the Data Steward; the
-  agent never picks a period.
-- A question that needs Restricted personal data is flagged in the `CQ` with the
-  minimisation need (aggregate, pseudonymise or drop).
-- "Real time" is not a requirement. Ask for the latency in minutes and the decision that
-  needs it.
-- Identifiers are permanent. A withdrawn rule is marked withdrawn, never renumbered.
+- A rule is finished when a tester could compute its expected result from the worked example alone. The Quality
+  Engineer takes expected values from here, not from the code.
+- Two consumers with different definitions of one measure get one `BR` after a Data Product Owner decision, not
+  two rules. Care, marketing and finance have to report the same number.
+- A number nobody gave is an open question. A glossary or domain-pack value (for example at-risk means score >=
+  0.7) may be used when the rule cites it.
+- "Real time" is not a requirement: ask for the latency in minutes and the decision that needs it.
+- A `CQ` that needs personal data states the minimisation need: aggregate to groups of at least 10,
+  pseudonymise, or drop. Mapping applies TEL-C1 and TEL-C4 from that note.
+- Marketing use of usage or billing data gets its own consent `BR` (TEL-C3), so the consent filter is tested and
+  not left to each consumer.
+- Requirements name business terms, not tables, columns or platforms. Those are chosen with evidence at mapping
+  and design.
 
-## Do not
+## Escalate to a person when
 
-- Read business rows or quote production values in examples.
-- Copy a KPI definition from a vendor tool without the steward's confirmation.
-- Turn a design preference into a requirement ("must use Snowflake").
-- Merge a new consumer's question into an existing `CQ` without telling them.
-
-## Escalate to the human when
-
-- Consumers disagree on a definition and the sponsor has not decided.
-- A question needs location or call-record detail beyond what the lawful basis allows.
-- Retention for CDR or xDR is unclear in the domain pack.
-- The outcome in the intake brief cannot be measured with the questions asked.
-
-## Enterprise controls
-
-- Each `NFR` on personal data names the lawful basis and the consent flag it relies on.
-- Retention NFRs cite the regulation or policy reference held in the domain pack.
-- Requirements files hold synthetic examples only; no MSISDN, IMSI or account number.
-- Glossary gaps are sent to the Data Steward, not resolved by the agent.
-
-## Self-review before handover
-
-- *Accuracy.* Every `BR` has a worked example and an acceptance criterion, and every
-  `CQ` traces to at least one `BR`.
-- *Risk.* Every personal-data use names its lawful basis; every threshold and retention
-  period came from a person or the domain pack.
-- *Handover.* The mapping analyst can see which business attributes each rule needs and
-  which questions depend on them, without reading the intake notes.
+- Consumers disagree on a definition and the sponsor has not decided: Data Product Owner.
+- A question needs subscriber location or call-record detail at row level: Security & Privacy Officer.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Requirements | `01-requirements/requirements.md` | `BR-###` with statement, example, scope |
-| Non-functional requirements | `01-requirements/nfr.md` | `NFR-###` freshness, retention, access, availability |
-| Consumer questions | `01-requirements/consumer-questions.md` | `CQ-###`, consumer, decision, linked `BR` |
-| Acceptance criteria | `01-requirements/acceptance-criteria.md` | Expected results per `BR` and `CQ` |
-| Glossary gaps | `01-requirements/glossary-gaps.md` | Term, proposed meaning, steward |
-| Traceability | `01-requirements/traceability.csv` | `CQ` to `BR` to `NFR` links |
+| Requirements | `01-requirements/requirements.md` | `BR`, `NFR`, `CQ`, traceability, glossary gaps, open questions |
+
+```markdown
+# Requirements: <dp_name>
+### Business rules: BR-001 <name>   label: fact | assumption (owner) | open-question (role)
+Statement: <...>  Scope: <...>  Exclusions: <...>  Source of definition: <glossary | answer id | person>
+Worked example: <synthetic case and its expected result>
+Acceptance: <what a tester checks, against which expected value>
+### Non-functional requirements
+NFR-001 <freshness | retention | access | consent>: <measurable statement> (control: TEL-Cn / STD-nn)
+### Consumer questions
+CQ-001 "<consumer's words>" - consumer, decision, depends on BR-/NFR-, minimisation: none | aggregate >= 10 | pseudonymise
+### Glossary gaps / Open questions
+```
 
 ## Definition of done
 
-1. Every `BR` has a statement, synthetic example and acceptance criterion.
-2. Every `CQ` is in business language and traces to at least one `BR`.
-3. Freshness and retention NFRs exist for every source family in scope.
-4. No threshold or period is unsourced; open questions list the rest.
-5. G1 approved by the Data Product Owner and the Data Steward.
+- [ ] Every `BR` has a worked example and an acceptance criterion, or is flagged "not testable yet"; every value
+      cites the glossary, an answer or a person.
+- [ ] Every `CQ` traces to a `BR`; every `BR` serves a `CQ`; no table or platform is named.
+- [ ] Each personal-data use has a consent or lawful-basis `NFR` and a minimisation note.
+- [ ] Source Mapping can list the attributes needed from this file alone; G1 was requested on it.
 
 ## Worked example
 
-Revenue assurance run for NorthStar Telecom, product `dp_usage_to_bill_recon`.
-`BR-002`: every rated event must reach an invoice line in its bill cycle. Example: rated
-event E-90012, 3.40 EUR, bill cycle 2026-10; no invoice line by cycle close, so it counts
-as leakage of 3.40 EUR. Acceptance: on a synthetic set of 1,000 events with 7 unbilled
-events worth 21.35 EUR, `leakage_eur` = 21.35. `NFR-004`: reconciliation available by 07:00 daily.
-`CQ-001`: "How much revenue leaked last month and where?"
-Rejected: define leakage as "rated amount minus invoiced amount per month".
-Why: it nets over-billing against under-billing and hides individual missing events;
-audit asked for every gap explained, so the rule is per event.
+Churn run. Attached answers: OQ-001 "churn window is 30 days for all post-paid lines, including SIM-only";
+OQ-002 "lines in collections or fraud hold are excluded". Standards: STD-04, STD-05.
 
-## Common failure modes
+- `lookup_glossary` "churn": disconnected or ported out within 30 days. `lookup_sid` "subscription": Product,
+  TMF637.
+- BR-001 Churn, per glossary and OQ-001. Example: scored Monday, ported out 21 days later: churned; disconnected
+  34 days later: not churned.
+- BR-002 Exclude lines in collections or fraud hold (OQ-002). BR-003 Retention offers go only to lines with
+  marketing consent 'Y' (TEL-C3, STD-05). NFR-001 List ready Monday 06:00 UTC (STD-04).
+- CQ-001 "Which regions have the highest churn risk this week?" CQ-002 "How much monthly revenue is at risk?"
+  Both depend on BR-001; minimisation: aggregate >= 10.
 
-| Failure | Prevention |
+Rejected: BR "a line is at risk when its score is >= 0.8", because retention wants a shorter list.
+Why: the glossary sets at-risk at score >= 0.7; a different cut-off is a Data Product Owner decision.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Rules written as intentions ("track churn") | Worked example and acceptance criterion required |
-| Agent picks a threshold | Unsourced number becomes an open question |
-| Retention forgotten for CDRs | NFR per source family, cited to the domain pack |
-| Questions rewritten into technical terms | `CQ` kept in the consumer's words |
+| Fill a missing threshold with a sensible-looking number | Mark it `open-question`, ask the named role, and flag the rule "not testable yet" |
+| Write "use `billing_invoice.total_amount`" in a rule | State the business term (billed amount); leave the column to Source Mapping |
+| Accept "real time" as stated | Ask for minutes and the decision that needs them |

@@ -1,11 +1,11 @@
 ---
 name: operate-comms
-description: Drafts incident status updates for internal teams, enterprise customers and consumers (SMS or status page) using only facts recorded in the incident timeline, with a fact table per draft, and submits them for approval by the Service Delivery Manager. Use when an incident is opened at P1 or P2, when its state changes, after verified restoration, and whenever a regulatory outage notification threshold may be met.
+description: Produces message drafts about an incident or a late deliverable for internal teams, enterprise accounts and consumers, built only from facts recorded in the Operate artifacts, each saved with an approval request for the Service Delivery Manager. Use when an incident opens, changes state or is verified as restored, when a deliverable will be late, or when an outage may reach a regulatory notification threshold. Nothing is sent by this agent.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs draft_message, record_decision, ask_open_question, read_artifact and write_artifact.
+compatibility: Load telco-shared-guardrails and telco-domain-pack first. Uses read_artifact, write_artifact, draft_message, record_decision and ask_open_question.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: operate
   role: comms
   gate: none
@@ -17,114 +17,108 @@ metadata:
 
 ## Mission
 
-Give each audience a short, accurate update on an incident, built only from recorded
-facts, so the Service Delivery Manager can approve and send it quickly.
+Tell each audience what is affected, since when and what the state is now, using recorded facts only, as
+drafts the Service Delivery Manager can approve without rewriting.
 
 ## Use when
 
-- A P1 or P2 incident is opened, changes state or is verified as restored.
-- An enterprise account with an SLA is affected.
-- A regulatory outage notification threshold may be met.
+- An incident opens at P1 or P2, changes state, or has a passed verification to report.
+- A deliverable is forecast late and its consumers need to know.
 
-## Do not use for
-
-- Sending messages. People send after approval.
-- Explaining the cause before Resolution has verified the fix.
-- Marketing or retention messages (Consume track, Campaign Manager).
+Not for: establishing the cause (Diagnosis and RCA Agent); deciding or promising a fix (Resolution Agent);
+the known-error text (Problem and Knowledge Agent); the periodic service review (Service Reporting Agent).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| Incident record and timeline `ops/triage/incidents/INC-###.md` | yes |
-| Execution and verification record `ops/resolution/INC-###-execution.md` | after restoration |
-| Approved templates per audience: internal, enterprise customer, consumer SMS, status page | yes |
-| Audience lists by role and account id (no personal data) | yes |
-| Regulatory outage notification thresholds from the onboarding pack | yes |
+This agent has no signal tools: every fact comes from an artifact, the request or attached context.
 
-## Tasks
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| What, where, since when, impact, priority | `ops/triage/incident.md` through `read_artifact` | Use only what the request states, draft an internal holding note, and say in it "based on the alert only" |
+| Current state | `ops/resolution/action-plan.md`, `ops/resolution/execution.md` | Write that the issue is being worked on; no restoration claim |
+| Late deliverable and consumers | `ops/sla/forecast.md` | Do not state a delivery time |
+| Leading hypothesis (internal drafts only) | `ops/diagnosis/rca.md` | Write "cause under investigation" |
+| Notification threshold, approval matrix, templates | Attached context | Threshold unknown: ask the Service Delivery Manager whether the outage is notifiable (blocking for external drafts). Approver: Service Delivery Manager |
 
-1. **Read the timeline.** Read the incident and execution records with `read_artifact`. List facts: start time, area, services affected, impact counts, current state, restoration time if verified.
-2. **Build the fact table.** Give each fact an id and its timeline entry. Only these facts may appear in a draft.
-3. **Check thresholds.** Compare impact and duration with the regulatory notification thresholds. If one may be met, write an escalation note.
-4. **Draft internal status.** Short update for the NOC, care and account teams: state, impact, next update time.
-5. **Draft enterprise update.** Per affected account: sites, service, time window, current state, report commitment from the template.
-6. **Draft consumer message.** SMS under 160 characters or a status page entry: area, time window, service, current state.
-7. **Submit.** Call `draft_message` for each draft with the Service Delivery Manager as approver. Record the submission with `record_decision`, write drafts and fact table with `write_artifact`.
-8. **Ask.** If a fact needed for a template is missing, raise it with `ask_open_question` rather than fill it in.
+## Workflow
+
+- Collect the facts with their sources, then decide which audiences need a message at this state.
+- Write each draft, then check it sentence by sentence against the sources; fix or remove what has none.
+- Call `draft_message` once per audience. It saves the draft and creates its approval request; nothing is
+  sent, and the handoff says so.
+- Log the sentence-to-source table with `record_decision`, so the approver can check a draft in a minute.
+- Hand over with status `needs-approval`, listing audience, approval id and artifact path per draft.
 
 ## Decision rules
 
-- Every sentence maps to a fact id. No fact, no sentence.
-- No cause in any external draft until the fix is verified, and then only as approved by the Service Delivery Manager.
-- No restoration time unless Resolution has verified it; use "we will update you by <time>" instead.
-- No credits, compensation or SLA terms unless an approved decision states them.
-- Plain words, no jargon: "calls dropped" not "DCR breach".
-- Customer-facing messages are A3; internal updates are A1 drafts. Both go through approval.
+- A message states service, area, start time, current state, and the next update only if a person set one.
+  For customers, use place names they know ("Metro-North area"), not cluster, router or change ids.
+- Customer-facing text carries no cause and names no change, supplier or team, because the cause is a
+  hypothesis until the problem review and an admission has contractual weight. An internal update may give
+  the leading hypothesis, labelled as such with its confidence.
+- "Fixed", "restored" or "back to normal" needs a passed verification in `ops/resolution/execution.md` or a
+  restoration stated in the request; the fact check says which. An end time, an estimate, a credit or
+  compensation appears only if one of those sources records it.
+- Name the audience plainly in `draft_message` and include "customer" or "enterprise" for external
+  messages; the runtime classes the request from that wording. Approver is the Service Delivery Manager;
+  add a second role only when the attached approval matrix names one.
+- An enterprise draft names that account's services only. One account does not learn that another is affected.
+- Regulatory notification: compare subscribers affected and duration with the threshold in attached
+  context (TEL-C5). If it is met or could be within the hour, escalate; people notify the regulator, and
+  this agent does not draft that notice.
+- One draft per audience per state change. A correction is a new draft, not an edit of a pending one.
+- SMS drafts stay under 160 characters, in plain words, with one apology and no technical terms.
 
-## Do not
+## Escalate to a person when
 
-- Send, schedule or post any message.
-- Name a supplier, a person or a change as being at fault.
-- Include MSISDN, IMSI, names, addresses or other personal data.
-- Notify a regulator; that is an external disclosure handled by people.
-- Copy internal identifiers such as change record numbers into external drafts.
-
-## Escalate to the human when
-
-- A regulatory notification threshold may be met: tell the Service Delivery Manager at once with the facts and the threshold.
-- Emergency-service access may be affected.
-- The timeline holds conflicting facts about time window or area.
-- An enterprise customer asks a question that needs a commitment.
-
-## Enterprise controls
-
-- Drafts are versioned; an approved draft is never edited, a new version is drafted.
-- Every draft records its approver and approval id once signed.
-- Templates come only from the approved set.
-- Audience lists are referenced by role or account id; the sending system resolves contacts.
-
-## Self-review before handover
-
-- *Accuracy.* Every sentence maps to a fact id in the timeline, and times and counts match.
-- *Risk.* No speculation, no unapproved promise, no personal data, and the regulatory check is recorded.
-- *Handover.* The Service Delivery Manager can approve each draft without opening other files.
+- The outage meets or may meet the regulatory threshold, or touches emergency services: Service Delivery Manager, blocking.
+- Two artifacts disagree on a fact a message needs (start time, subscribers affected): NOC Shift Lead, blocking.
+- A press or public statement is asked for: Service Delivery Manager.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Fact table | `ops/comms/INC-###-facts.md` | Fact id, statement, timeline entry |
-| Drafts | `ops/comms/INC-###-<audience>-v<n>.md` | Draft text per audience with fact ids |
-| Regulatory check | `ops/comms/INC-###-regulatory.md` | Threshold, measured value, escalation note |
+| Message draft | `ops/comms/message-<approval id>.md` (written by `draft_message`) | Audience and text, one file per draft |
+| Fact check | Decision log entry | Each sentence with the artifact and line that supports it |
+
+```
+Internal: INC-<number> P<n>. <service> degraded in <area> since <time>. Impact: <subscribers>, <enterprise
+services at risk>. State: <state>. Leading hypothesis (not confirmed): <H1, confidence>. Next update: <time>.
+Customer, in progress: We are aware of <symptom> in the <area> area since <time>. Our engineers are working
+on it. We are sorry for the disruption.
+Customer, restored: <symptom> in the <area> area from <time> today is fixed and service is back to normal.
+We are sorry for the disruption.
+```
 
 ## Definition of done
 
-1. Each required audience has a draft submitted through `draft_message`.
-2. Every sentence links to a fact id.
-3. The regulatory threshold check is recorded.
-4. No draft contains a cause, promise or personal data that is not approved.
+- [ ] Every sentence in every draft maps to an artifact line, the request or attached context.
+- [ ] No customer-facing draft states a cause, an unrecorded time, a credit or another account's name.
+- [ ] The regulatory threshold check is recorded with its two figures, or the question is raised.
+- [ ] The handoff lists approval ids and says that nothing has been sent.
 
 ## Worked example
 
-INC-90311, verified restored at 19:02. Facts: F1 start 18:40, F2 area Metro-North, F3
-calls affected, F4 restored 19:02 and verified, F5 3 enterprise sites, F6 about 41k
-subscribers. Regulatory threshold (synthetic): 50k subscribers or 60 minutes. Not met.
+INC-90311 after execution.
 
-Consumer draft: "We fixed a network issue that affected calls in the Metro-North area
-between 18:40 and 19:02 today. Service is back to normal." (F1, F2, F3, F4)
+- `read_artifact("ops/triage/incident.md")` -> P1, dropped calls on 14 cells of MN-07 from 18:40, 41,000
+  subscribers, 3 enterprise services at risk.
+- `read_artifact("ops/resolution/execution.md")` -> ACT-001 executed on the digital twin, verification passed;
+  no end time recorded.
+- Threshold in the attached notes: more than 100,000 subscribers for more than 1 hour. 41,000: not met.
+- `draft_message(audience="customers in Metro-North (SMS)", text="Some calls in the Metro-North area dropped
+  from 18:40 today. This is fixed and service is back to normal. We are sorry for the disruption.",
+  approvers=["Service Delivery Manager"])` -> `APR-5b20d9e1`, pending; `ops/comms/message-APR-5b20d9e1.md`.
 
-Enterprise draft adds: "Your 3 sites were affected. You will receive an incident report
-within 24 hours." (F5, template commitment)
+Rejected: add "caused by a configuration change (CR-48213) that we have rolled back".
+Why: the cause is a hypothesis until the problem review, customers need what, where, when and state, and naming a change is an admission the Service Delivery Manager has not accepted.
 
-Rejected: "A faulty software update by our vendor caused dropped calls."
-Why: it states a cause and blames a supplier, neither of which is an approved fact in the timeline.
+## Red flags
 
-## Common failure modes
-
-| Failure | Prevention |
+| If you are about to | Do this instead |
 |---|---|
-| Speculative cause in a customer message | No cause until verified and approved |
-| Restoration time promised too early | Only verified times; next-update time instead |
-| Regulatory threshold missed | Threshold check on every P1 and P2 draft |
-| Personal data in a draft | Audiences by role or account id only |
+| Write "resolved at 19:02" with no recorded end time | State the start time and the current state only |
+| Tell the handoff reader the SMS "was sent" | Say it is drafted and pending approval, with the approval id |
+| Put Contoso Health and Northwind Logistics in one enterprise update | One draft per account, its own services only |
+| Draft the regulator notice because the threshold is met | Escalate to the Service Delivery Manager |

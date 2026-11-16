@@ -124,7 +124,7 @@ def data_engineer(task: str, call: Call, s: Session) -> str:
     sc = _build_scenario(task)
     call("read_artifact", {"path": "03-design/design.md"})
     model = (f"-- models/silver/slv_subscriber_month.sql (generated)\n{{{{ config(materialized='incremental', unique_key='subscriber_key') }}}}\n"
-             "select a.account_id, a.tariff_code as plan_code, i.bill_month, sum(i.total_amount) as billed_eur\n"
+             "select a.account_id, a.tariff_code, i.bill_month, sum(i.total_amount) as billed_eur\n"
              "from {{ source('bronze','billing_invoice') }} i join {{ source('bronze','billing_account') }} a using (account_id)\n"
              "group by 1,2,3\n")
     tests = "version: 2\nmodels:\n  - name: slv_subscriber_month\n    columns:\n      - name: account_id\n        tests: [not_null]\n"
@@ -148,7 +148,7 @@ def quality_engineer(task: str, call: Call, s: Session) -> str:
     recon = call("run_sandbox_sql", {"sql": "SELECT (SELECT COUNT(*) FROM billing_invoice) AS src_rows, (SELECT ROUND(SUM(total_amount),2) FROM billing_invoice) AS src_total"})
     probe = call("run_sandbox_sql", {"sql": "SELECT msisdn FROM crm_customer LIMIT 5"})
     ev = (f"# Test evidence\n\nDQ results: {json.dumps(dq)}\n\nReconciliation (source control totals): {json.dumps(recon['rows'] if 'rows' in recon else recon)}\n\n"
-          f"Masking probe (expected refusal): {json.dumps(probe)[:200]}\n\nTC-004 DQ-004 fails: status SUSPENDED is valid in source but missing from the rule. "
+          f"Masking probe (Restricted column must come back NULL): {json.dumps(probe)[:260]}\n\nTC-004 DQ-004 fails: status SUSPENDED is valid in source but missing from the rule. "
           "Returned to Mapping as a rule defect, not a data defect.\n")
     call("write_artifact", {"path": "05-test/evidence.md", "content": ev})
     ap = _gate(call, "Quality evidence (1 rule defect returned to Mapping)", ["05-test/evidence.md"])
@@ -272,11 +272,16 @@ def resolution(task: str, call: Call, s: Session) -> str:
     approved = [a for a in mine if a.status == "approved"]
     if approved:
         res = [call("execute_approved_action", {"approval_id": a.id}) for a in approved]
-        return _handoff("done", [], [], "Executed and verified: " + "; ".join(r.get("verification", r.get("error", "")) for r in res))
+        call("write_artifact", {"path": "ops/resolution/execution.md", "content": "# Execution record\n\n" + "\n".join(
+            f"- {a.id} {a.title}: {r.get('verification', r.get('error', ''))}" for a, r in zip(approved, res)) + "\n"})
+        return _handoff("done", ["ops/resolution/execution.md"], [], "Executed and verified: " + "; ".join(r.get("verification", r.get("error", "")) for r in res))
     if mine:
         return _handoff("needs-approval", [], [a.id for a in mine], "Waiting for approvers; nothing executed.")
     call("read_artifact", {"path": "ops/diagnosis/rca.md"})
     ids = [call("propose_action", a).get("approval_id") for a in _ACTIONS[sc]]
+    call("write_artifact", {"path": "ops/resolution/action-plan.md", "content": "# Action plan\n\n" + "\n".join(
+        f"- [{a['action_class']}] {a['title']} | blast radius: {a['blast_radius']} | rollback: {a['rollback']} | verify: {a['verify']} | approvers: {', '.join(a['approvers'])}"
+        for a in _ACTIONS[sc]) + "\n"})
     blocked = call("propose_action", {"title": "Disable alarm forwarding for cluster MN-07 to stop the storm", "action_class": "A2",
                                       "steps": "disable alarm forwarding", "blast_radius": "cluster", "rollback": "re-enable",
                                       "verify": "none", "approvers": ["NOC Shift Lead"]}) if sc == "noc" else {}
@@ -382,6 +387,8 @@ def next_best_action(task: str, call: Call, s: Session) -> str:
     p = call("propose_business_action", {"action_type": "retention_offer", "title": "Retention offer to high-value at-risk lines in Metro-North",
                                          "audience": "High-value lines with risk >= 0.7 and consent_marketing = Y", "expected_value": "~610 saves x EUR 47.50 ARPU = EUR 29k MRR",
                                          "checks": ["Consent flag Y on every line", "Discount within approved band", "10% holdout"]})
+    call("write_artifact", {"path": "consume/actions/proposal.md", "content": f"# Proposal\n\nEvidence (at_risk_arpu by segment): {json.dumps(r['rows'])}\n"
+                            f"Approval request: {p.get('approval_id')} -> {', '.join(p.get('approvers', []))}\n"})
     return f"{LABEL}Evidence: {json.dumps(r['rows'])}\nProposed {p.get('approval_id')} -> {', '.join(p.get('approvers', []))}. Nothing is sent until both sign."
 
 
@@ -389,6 +396,8 @@ def care_copilot(task: str, call: Call, s: Session) -> str:
     r = call("query_metric", {"metric": "churn_at_risk_lines", "group_by": ["top_driver"], "filters": {"region": "Metro-North"}})
     p = call("propose_business_action", {"action_type": "care_credit", "title": "1 GB goodwill credit for customers affected by INC-90311",
                                          "audience": "Lines in the incident footprint", "expected_value": "Avoids ~2,900 inbound calls", "checks": ["Footprint from incident only", "Approved script CARE-NET-03"]})
+    call("write_artifact", {"path": "consume/care/case-brief.md", "content": f"# Case brief\n\nRegion drivers (Metro-North): {json.dumps(r['rows'][:3])}\n"
+                            f"Customer-level history: not available to this agent.\nGoodwill credit: {p.get('approval_id')} (pending approval)\n"})
     return (f"{LABEL}Case summary (masked ****4471): three contacts in 12 days (dropped calls, roaming charge, cancellation). Region drivers: "
             f"{json.dumps(r['rows'][:3])}. Suggested reply: acknowledge the fixed network issue, explain roaming charge, offer loyalty plan. "
             f"Goodwill credit proposed as {p.get('approval_id')}.")
@@ -398,6 +407,7 @@ def enterprise_account(task: str, call: Call, s: Session) -> str:
     r = call("query_metric", {"metric": "sla_credit_exposure_eur", "group_by": ["account"]})
     d = call("draft_message", {"audience": "Northwind Logistics account team (internal)", "text": "Availability MTD 99.71% vs 99.9% SLA; root cause INC-90311 fixed; "
                                "proposed service review call this week.", "approvers": ["Service Delivery Manager"]})
+    call("write_artifact", {"path": "consume/accounts/account-brief.md", "content": f"# Account brief\n\nCredit exposure by account: {json.dumps(r['rows'][:5])}\n"})
     return f"{LABEL}Credit exposure by account: {json.dumps(r['rows'][:5])}\nBrief drafted for approval: {d.get('approval_id')}"
 
 

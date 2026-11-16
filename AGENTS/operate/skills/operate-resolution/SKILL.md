@@ -1,11 +1,11 @@
 ---
 name: operate-resolution
-description: Produces an action plan of runbook actions ACT-### for a diagnosed incident or a routed proposal, each with action class, blast radius, rollback, verify step and change record, requests the right approvals, and executes an approved A2 or A3 action exactly as signed, then verifies it and rolls back on failure. Use when a diagnosis record is ready, when the SLA and Batch Guard or FinOps and Capacity Agent routes a proposal, or when a signed approval arrives.
+description: Produces the action plan for a diagnosed incident - one approval request per runbook action with class, steps, blast radius, rollback, verification and approvers - and, when invoked again after the approvers have signed, executes each approved action on the digital twin, reads the verification result and records it. Use when an RCA is ready, or when signed approvals exist for actions already proposed.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs propose_action, execute_approved_action, get_alarms, get_kpis, get_topology, get_recent_changes, search_kedb, get_pipeline_runs, get_model_metrics, record_decision, ask_open_question, read_artifact and write_artifact.
+compatibility: Load telco-shared-guardrails and telco-domain-pack first. Uses read_artifact, write_artifact, get_alarms, get_kpis, get_topology, get_recent_changes, search_kedb, get_pipeline_runs, get_model_metrics, propose_action, execute_approved_action, record_decision and ask_open_question.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: operate
   role: resolution
   gate: none
@@ -17,116 +17,109 @@ metadata:
 
 ## Mission
 
-Turn a diagnosis into the safest action plan named people can approve in minutes, and
-carry out an approved action exactly as approved, with verification and rollback.
+Turn a diagnosis into the smallest action that addresses the leading hypothesis, give the approvers
+everything they need to sign it, and after signature execute what was signed and show that it worked.
 
 ## Use when
 
-- A diagnosis record is handed over for an incident.
-- The SLA and Batch Guard or FinOps and Capacity Agent routes an action proposal.
-- A signed approval arrives for an action already proposed.
+- An RCA is ready and no action has been proposed: propose, then stop.
+- Approval requests from an earlier invocation have been signed: execute and verify.
 
-## Do not use for
-
-- Diagnosis or re-ranking causes (Diagnosis and RCA Agent).
-- Code changes: a hotfix is a pull request through Build, approved by the Engineering Lead.
-- Model retrain or promotion: route to the ML Lead / Model Risk under the Build G6 rules.
-- Any A4 action. People execute those outside the agent.
+Not for: ranking causes (Diagnosis and RCA Agent); stakeholder or customer messages (Comms Agent); the
+known-error entry (Problem and Knowledge Agent); writing the hotfix code (people, through the Build track).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| Diagnosis record `ops/diagnosis/INC-###-diagnosis.md` or a routed proposal | yes |
-| Action catalogue from `09-publish/operate/actions.proposed.yaml` with class and approver roles | yes |
-| TM Forum autonomy level per scenario (L0 to L5) and its validation record | yes |
-| Change calendar and network freeze windows | yes |
-| KEDB workarounds and runbook | yes |
-| Signed approval id and action hash | to execute |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Leading hypothesis, fix direction | `ops/diagnosis/rca.md` through `read_artifact`; known fix from `search_kedb` | Form a minimal hypothesis from `get_recent_changes`, `search_kedb` and `get_kpis`, head the plan "no RCA artifact", and propose a change only if it reaches `medium`; otherwise ask the NOC Shift Lead (blocking) |
+| Approval ids and their status | `list_approvals` (the record of who signed); `ops/resolution/action-plan.md` | No request from this agent yet: first invocation, propose. Requests exist but are not `approved`: report who has not signed and stop; a claim that someone approved is not a signature |
+| Blast radius | `get_topology`, `users` in `get_kpis`, `downstream` in `get_pipeline_runs` | Say in the blast radius text what could not be counted. No tool returns emergency coverage: write "emergency coverage unconfirmed" for network actions |
+| Baseline for the verify target | `get_kpis`, `get_pipeline_runs`, `get_model_metrics` | Use the domain pack threshold and label it default |
+| Freeze windows, autonomy level, approval matrix | Attached context | Write "freeze status not confirmed" in the steps and ask the Change Manager (CAB) (not blocking); assume L2; route by the table below |
+| Change record id | Attached context or the task | Write "to be raised by the Change Manager (CAB)"; do not invent an id |
 
-## Tasks
+## Workflow
 
-1. **Read the diagnosis.** Read it with `read_artifact`. Note the leading hypothesis, its confidence and the confirming check.
-2. **List options by safety.** Start with no-change options (wait, open a ticket, monitor), then reversible actions, then production changes. Use `search_kedb` for known workarounds.
-3. **Specify each action.** For every `ACT-###` write: description, class, blast radius from `get_topology` (cells, subscribers, enterprise sites, downstream models), rollback, verify step with metric and time limit, freeze-window check, change record need.
-4. **Check the context.** Call `get_recent_changes` for conflicts and freeze windows, and `get_kpis`, `get_alarms` or `get_pipeline_runs` for the baseline the verify step will use.
-5. **Propose.** Call `propose_action` for each action. A2 network: NOC Shift Lead. A2 platform: Service Delivery Manager. A3: that approver plus the Change Manager (CAB) and a change record. Record the plan with `record_decision`.
-6. **Stop and wait.** Write the plan with `write_artifact` and stop until a signed approval arrives.
-7. **Execute.** Call `execute_approved_action` only with the approval id whose hash matches the action as written and every required role signed.
-8. **Verify and roll back.** Check the verify metric with `get_kpis`, `get_pipeline_runs` or `get_model_metrics` within the stated time. If it fails, run the approved rollback, record it and hand back to diagnosis.
+The order protects the network: nothing runs before signatures, nothing is called fixed before verification.
+Steps 1 to 4 are the first invocation (nothing proposed yet); 5 to 8 are the second (requests are signed).
+1. Read the RCA and choose actions for the leading hypothesis, safest first.
+2. Call `propose_action` once per action. It creates one approval request and executes nothing.
+3. Write `ops/resolution/action-plan.md` with each approval id and content hash; log with `record_decision`.
+4. Stop with status `needs-approval`. Do not call `execute_approved_action` in this invocation.
+5. Call `list_approvals`, then `execute_approved_action` for each request with status `approved`, in plan
+   order. A refusal means the request is not fully signed: record it and stop, without re-proposing.
+6. Read `verification` in the result: it is the verification on the digital twin. Older KPI snapshots are not.
+7. Passed: write `ops/resolution/execution.md`, say "executed on the digital twin", hand over to the Comms Agent.
+8. Not passed: do not retry. Running the rollback is a new action, so propose it with `propose_action` to the
+   same approvers, record both in `ops/resolution/execution.md`, and hand back to the Diagnosis and RCA Agent.
 
 ## Decision rules
 
-- Prefer the option with the smallest blast radius that addresses the leading hypothesis.
-- An action is only as high as the hypothesis behind it: below 0.5 confidence, propose read-only or ticket actions first.
-- A2 is reversible and bounded; anything touching production network configuration for live subscribers, a production pipeline rerun or a customer-facing output is A3.
-- A4 is never proposed or executed: deletes, access grants, disabling or suppressing alarms, customer-data export, new spend commitments.
-- During a network freeze window, no network A2 or A3 action runs unless the Change Manager (CAB) approves an emergency change.
-- Autonomy follows the scenario's validated TM Forum level. At L3 or below every A2 and A3 action waits for signatures. Only a human decision recorded in the scenario register raises the level.
-- One retry of a failed execution at most; then stop and escalate.
-- Any edit to an approved action voids the approval.
+- Choose the smallest blast radius that addresses the leading hypothesis. Request approval only for hypotheses
+  at `medium` or above; a `low` one gets an open question, because a change on a guess adds a second incident.
+- One action per approval request, and separate causes get separate actions (a hotfix and a scale-out), so
+  approvers can sign one and return the other.
+- `verify` is a metric, a target and a time limit drawn from the pre-incident baseline; `rollback` names the
+  stored config or prior version. Network steps run in waves, so a wrong fix is caught on 5 cells, not 14.
+- `propose_action` refuses A4 wording (delete, drop, grant, revoke, disable alarm, masking or audit, export
+  of identifiers). If the only effective action is one of these, escalate instead of rewording it.
+- Record the scenario's autonomy level in the plan; at every level execution needs a signed approval id.
+- Class and approvers (attached context overrides; a network action during a freeze is an emergency change, A3):
 
-## Do not
+| Action | Class | Approvers |
+|---|---|---|
+| Reversible, bounded: network / platform (scale a worker pool with auto-revert) | A2 | NOC Shift Lead / Service Delivery Manager |
+| Production network change (parameter rollback) | A3 | NOC Shift Lead, Change Manager (CAB) |
+| Production pipeline rerun / code hotfix | A3 | Service Delivery Manager / Engineering Lead, plus Change Manager (CAB) |
+| Model retrain with shadow run / model promotion | A2 / A3 | ML Lead / Model Risk (plus Change Manager (CAB) for promotion) |
 
-- Execute without a matching, fully signed approval id.
-- Combine actions so one approval covers more than was reviewed.
-- Mute, shelve or disable alarms to clear an incident.
-- Scale or add paid capacity beyond what an approved action states.
-- Close an incident before the verify step passes.
+## Escalate to a person when
 
-## Escalate to the human when
-
-- Verification fails and rollback also fails: call the NOC Shift Lead or Service Delivery Manager at once.
-- The only effective action is A4 or outside the action catalogue.
-- An approval has not arrived and time to SLA breach is under 30 minutes.
-- The incident touches emergency-service coverage or a regulated deliverable.
-
-## Enterprise controls
-
-- Every A3 action has a change record before execution; emergency changes are recorded within the change process.
-- Segregation of duties: one person cannot sign two roles on the same action.
-- Approvals bind to the action hash; execution logs the approval id, executor identity and time.
-- Rollback is written and, for network changes, rehearsed in the digital twin where available.
-- The autonomy register is read-only for this agent.
-
-## Self-review before handover
-
-- *Accuracy.* Each action addresses a stated hypothesis, and blast radius and verify steps use real topology and baselines.
-- *Risk.* Every action has the right class, approvers, rollback and freeze-window check; nothing A4 is present.
-- *Handover.* Comms gets the verified outcome and timeline; Problem and Knowledge gets the actions, results and any rollback.
+- Verification does not pass: NOC Shift Lead (network) or Service Delivery Manager (platform), blocking.
+- The only effective action is A4, commits new spend, or touches emergency-service elements: NOC Shift Lead.
+- Approvals are pending and `ops/sla/forecast.md` shows a breach within 30 minutes: Service Delivery Manager.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Action plan | `ops/resolution/INC-###-plan.md` | Options by safety, `ACT-###` with class, blast radius, rollback, verify step, approvers, change record |
-| Execution record | `ops/resolution/INC-###-execution.md` | Approval id, hash, time, result, verify metric, rollback if any |
-| Approval requests | via `propose_action` | One per action, with approver roles |
+| Action plan | `ops/resolution/action-plan.md` | One block per `ACT-###` as below, options not chosen, autonomy level |
+| Execution record | `ops/resolution/execution.md` | Per action: approval id, environment, verification text, outcome, rollback proposal if any |
+
+```
+### ACT-001 <title>
+Addresses: H1 (<confidence>), INC-<number>   Class: <A2|A3>   Approvers: <roles>
+Steps: <ordered, in waves for network>   Blast radius: <cells, subscribers, services, downstream>
+Rollback: <inverse step>   Verify: <metric> <target> within <time>   Change record: <id or who raises it>
+Approval: <approval id>, hash <content hash>, status <pending|approved|executed>
+```
 
 ## Definition of done
 
-1. Every proposed action has class, blast radius, rollback, verify step and approver roles.
-2. Every A3 action has a change record reference.
-3. Each executed action has a matching signed approval and a verify result.
-4. A failed verification has a rollback record and a handback to diagnosis.
+- [ ] Every action names the hypothesis it addresses and has class, blast radius, rollback, verify and approvers.
+- [ ] First invocation: nothing executed, an approval id per action in the plan, no id or change record invented.
+- [ ] Second invocation: each execution has its `verification` text recorded.
+- [ ] A failed verification has a rollback proposal and a handback; the handoff says what people do next.
 
 ## Worked example
 
-INC-90311, leading hypothesis CR-48213 (confidence 0.71), autonomy level L2 for this scenario.
+INC-90311. RCA: H1 CR-48213, `high`; KE-2207 fix "roll back offset from stored config". Notes: no freeze, L2.
+- First invocation: `propose_action(title="Roll back CR-48213 on 14 MN-07 cells from stored config",
+  action_class="A3", steps="Re-apply the previous offset in waves of 5 cells; check DCR after each",
+  blast_radius="14 cells, about 41,000 subscribers; emergency coverage unconfirmed", rollback="Re-apply
+  CR-48213", verify="Cluster DCR < 1.2% within 15 min", change_record="to be raised by CAB",
+  approvers=["NOC Shift Lead", "Change Manager (CAB)"])` -> `APR-3f9a12c0`, pending. Plan written; stop.
+- Second invocation: `execute_approved_action(approval_id="APR-3f9a12c0")` -> digital twin, "Verify step
+  'Cluster DCR < 1.2% within 15 min' passed". Execution record written; handed to Comms.
 
-- ACT-1: roll back CR-48213 on the 14 cells from stored config. Class A3. Approvers: NOC Shift Lead and Change Manager (CAB). Blast radius: 14 cells, about 41k subscribers. Rollback: re-apply CR-48213. Verify: DCR below 1.2% within 15 minutes. No freeze window active.
-- ACT-2: open a transport ticket for the MN-AGG-2 flap. Class A1, no change.
+Rejected: propose muting alarm forwarding for MN-07 to quiet the storm while the approvers decide.
+Why: it removes the signal that shows whether the rollback worked, and switching off alarms is A4.
 
-Both signed at 18:52. Executed 18:53. DCR at 0.9% after 11 minutes; verified.
+## Red flags
 
-Rejected: reset the 14 cells now as a quick fix while the rollback is approved.
-Why: a reset drops every call on 14 cells, does not address the leading hypothesis and has no approval.
-
-## Common failure modes
-
-| Failure | Prevention |
+| If you are about to | Do this instead |
 |---|---|
-| Fix aimed at the wrong cause | Action tied to a hypothesis and its confidence |
-| Approval covers a changed action | Hash binding; any edit voids it |
-| Change in freeze window | Freeze-window check on every network action |
-| Autonomy creep | Level read from the register, never raised by the agent |
+| Call `execute_approved_action` right after proposing | Stop; execution is a second invocation after signatures |
+| Report "fixed" from the plan or from your own reading of old KPIs | Quote the `verification` text from the execution result |
+| Retry or improvise when verification does not pass | Propose the rollback, record it, hand back to diagnosis |

@@ -8,9 +8,8 @@ from telcocrew.tools import TOOLS
 
 AGENTS = load_agents()
 SKILLS = load_skills()
-SECTIONS = ["Mission", "Use when", "Do not use for", "Inputs", "Tasks", "Decision rules", "Do not",
-            "Escalate to the human when", "Enterprise controls", "Self-review before handover", "Outputs",
-            "Definition of done", "Worked example", "Common failure modes"]
+SECTIONS = ["Mission", "Use when", "Inputs", "Workflow", "Decision rules", "Escalate to a person when", "Outputs",
+            "Definition of done", "Worked example", "Red flags"]
 ROLES = {"Data Product Owner", "Data Architect", "Data Steward", "Engineering Lead", "QA Lead", "Change Manager (CAB)",
          "Security & Privacy Officer", "ML Lead / Model Risk", "NOC Shift Lead", "Service Delivery Manager",
          "Problem Manager", "Campaign Manager", "Customer Care Lead", "Research Lead"}
@@ -52,19 +51,34 @@ def test_gates_are_unique_and_complete():
 
 
 @pytest.mark.parametrize("agent_id", sorted(AGENTS))
-def test_skill_has_every_section_in_order(agent_id):
+def test_skill_follows_the_v2_contract(agent_id):
     s = SKILLS[agent_id]
-    meta = s.meta
-    assert meta["name"] == agent_id and meta["metadata"]["version"] == "1.0.0"
-    assert meta["metadata"]["track"] == AGENTS[agent_id].track
+    meta, agent = s.meta, AGENTS[agent_id]
+    assert meta["name"] == agent_id and meta["metadata"]["version"] == "2.0.0"
+    assert meta["metadata"]["track"] == agent.track
+    assert 80 <= len(meta["description"]) <= 500
     heads = re.findall(r"^## (.+)$", s.body, flags=re.M)
     assert heads == SECTIONS, heads
-    review = s.body.split("## Self-review before handover")[1].split("\n## ")[0]
-    assert all(x in review for x in ("*Accuracy.*", "*Risk.*", "*Handover.*"))
-    example = s.body.split("## Worked example")[1].split("\n## ")[0]
-    assert re.search(r"Rejected:.*\n(?:.*\n)*?.*Why:", example)
-    assert 60 <= len(s.body.splitlines()) <= 200
-    assert "ADEF" not in s.body
+    section = {h: s.body.split(f"## {h}\n")[1].split("\n## ")[0] for h in SECTIONS}
+    assert "Not for:" in section["Use when"]
+    assert re.search(r"\|\s*Input\s*\|.*\|\s*If it is missing\s*\|", section["Inputs"])
+    assert section["Definition of done"].count("- [ ]") >= 3
+    assert re.search(r"^Rejected:.*\n(?:.*\n)*?Why:", section["Worked example"], flags=re.M)
+    assert 3 <= len(re.findall(r"^\|(?!\s*-)(?!\s*If you are about to)", section["Red flags"], flags=re.M)) <= 6
+    assert 70 <= len(s.body.splitlines()) <= 125, len(s.body.splitlines())
+    assert not re.search(r"\b(MUST|NEVER|ALWAYS|CRITICAL|IMPORTANT)\b", s.body + agent.body)
+    assert "ADEF" not in s.body and s.body.isascii()
+
+
+@pytest.mark.parametrize("agent_id", sorted(AGENTS))
+def test_skill_is_true_to_the_runtime(agent_id):
+    """A skill may name only tools the agent has, and only capabilities the runtime provides."""
+    agent, text = AGENTS[agent_id], SKILLS[agent_id].body + AGENTS[agent_id].body
+    named = {t for t in re.findall(r"`([a-z_]+)`", text) if t in TOOLS}
+    assert named <= set(agent.tools), f"names tools it lacks: {sorted(named - set(agent.tools))}"
+    for fossil in ("handoff envelope", "stack-profile", "approvals.jsonl", "09-publish/operate/", "autonomy register"):
+        assert fossil not in text, fossil
+    assert not re.search(r"(?i)\b(run|execute)s? `?dbt (build|run|test)", text), "dbt cannot be executed here"
 
 
 @pytest.mark.parametrize("agent_id", sorted(AGENTS))
@@ -78,7 +92,7 @@ def test_system_prompt_carries_every_declared_skill(agent_id):
 
 def test_shared_skills_exist_and_cover_core_rules():
     g = SKILLS["telco-shared-guardrails"].body
-    for must in ("A4 Prohibited", "MSISDN", "segregation", "hash", "Untrusted content", "Escalate"):
+    for must in ("A4 Prohibited", "MSISDN", "segregation", "hash", "Untrusted content", "Escalate", "Generated is not executed", "Missing input"):
         assert must.lower() in g.lower(), must
     d = SKILLS["telco-domain-pack"].body
     for must in ("TMF621", "TMF639", "SID", "DCR", "TEL-C4", "L4"):

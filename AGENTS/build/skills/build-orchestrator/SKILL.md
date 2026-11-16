@@ -1,11 +1,11 @@
 ---
 name: build-orchestrator
-description: Produces the intake brief, delivery plan, stage scope, risk register and run status for a telco data product build, and routes handoffs and returns between Build agents. Use when a new business ask arrives, when scope or sponsor changes, or when a stage returns work and the next owner must be decided.
+description: Produces the intake brief for a telco data product build - measurable outcome, sponsor, consumers, candidate sources from metadata, stage scope for G1 to G9 with approvers, risks and open questions - and requests G0. Use when a new business ask arrives, when sponsor, outcome or scope changes, or when returned work needs an owning stage named.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, list_source_metadata, lookup_glossary, record_decision, ask_open_question and request_gate tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: delivery-orchestrator
   gate: G0
@@ -17,138 +17,107 @@ metadata:
 
 ## Mission
 
-Turn a business ask into a scoped, owned and gated plan, so that every later agent knows
-what outcome it serves, who decides, and what is out of scope.
+Turn a business ask into one intake brief: the outcome the build serves, who decides at each gate, and what is
+out of scope. Every later Build agent starts from it; the Data Product Owner approves it at G0.
 
 ## Use when
 
-- A new business ask arrives from a sponsor (for example the Chief Commercial Officer).
-- The sponsor, outcome, consumers or stack profile change during a run.
-- A stage returns work and the next owner, or an escalation, must be decided.
+- A sponsor asks for a new data product or a change to one.
+- Sponsor, outcome, consumers or scope change, or returned work needs an owning stage named.
 
-## Do not use for
-
-- Writing requirements, rules or consumer questions (Business Analyst).
-- Choosing sources, ingestion patterns or platforms (Mapping and Architecture).
-- Approving a gate. Only the named human roles approve.
+Not for: rules and consumer questions (build-business-analyst); choosing sources or classifying columns
+(build-source-mapping); platform, cost or design choices (build-solution-architect).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| Business ask with sponsor name and role | yes |
-| `control/stack-profile.yaml` (platform, ingestion, catalog, Git host) | yes |
-| `control/domain-pack.yaml` (TM Forum domains, classifications, regulations) | yes |
-| Existing data products and prior run folders | if available |
-| Change calendar and network freeze windows | if available |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Business ask: outcome, sponsor, consumers | The task text | No named sponsor or no outcome: write the brief anyway, mark the field `open-question`, and raise a blocking `ask_open_question` to the Data Product Owner |
+| Team standards, earlier answers, constraints | Attached context | Proceed; state "no context attached" in the brief so later stages ask for freshness and release-window standards themselves |
+| Candidate source systems and tables | `list_source_metadata` | A needed system is not in the metadata: list it as a gap and ask the Data Architect (non-blocking) |
+| Business terms in the ask | `lookup_glossary` | No match: keep the sponsor's wording in quotes and list a glossary gap for the Data Steward |
 
-Reject the ask if it has no named sponsor or no observable business outcome.
+## Workflow
 
-## Tasks
-
-1. **Restate the ask.** Write the outcome as a measurable change (for example "weekly
-   churn-risk list before contract end") and name the sponsor, consumers and decision it
-   supports. Check terms with `lookup_glossary`.
-2. **Place it in the telco map.** Name the TM Forum domain (Customer, Product, Service,
-   Resource, Partner, Enterprise) and the business area (BSS billing, OSS assurance,
-   RAN, fraud, enterprise SLA).
-3. **Validate the stack profile.** Confirm the profile names a warehouse or lakehouse
-   (Snowflake or Databricks), ingestion options (GoldenGate CDC, batch framework, Kafka),
-   dbt runtime, catalog and Git host. A missing slot is a blocking open question.
-4. **List candidate systems.** Use `list_source_metadata` for system and table names
-   only: billing (Oracle or Db2), CRM, OSS PM counters, CDR/xDR lake, mediation, OCS,
-   TMF621 ticketing, TMF638/639 inventory. No profiling, no row reads.
-5. **Set stage scope.** For each of G1 to G9 mark in scope, out of scope with a reason, or
-   deferred with an owner. The ML stage (G6) is in scope only if the ask needs a score or
-   forecast.
-6. **Draft the delivery plan.** Stages, agent, gate, approvers, inputs, expected outputs
-   and dependencies. Use the approver titles from the authoring contract unchanged.
-7. **Open the risk register.** Restricted data (MSISDN, IMSI, location), regulatory
-   retention for CDRs, source access, freeze windows, cost. Each risk has an owner.
-8. **Raise open questions** with `ask_open_question`, marking each blocking or not and
-   naming the role that must answer.
-9. **Record decisions** on scope and sequencing with `record_decision`.
-10. **Request G0** with `request_gate`, listing the intake brief and delivery plan, then
-    stop.
-11. **Route returns** after G0: read the return reason, send it to the owning agent, and
-    increment the return count for that gate in `00-intake/run-status.md`.
+- Restate the ask as a measurable outcome and the decision it supports, in the sponsor's terms. Name the
+  sponsor, each consumer and the freshness they asked for.
+- Name the data product (`dp_<subject>`), its SID domain, and the candidate tables from `list_source_metadata`:
+  owner, ingestion pattern and which columns are Restricted. Names only; profiling and mapping belong to the
+  next stages.
+- Decide stage scope: each gate G1 to G9 is `in`, `out` with a reason, or `deferred` with an owner.
+- List risks with an owner and the gate where each is checked.
+- Raise open questions with `ask_open_question`, record the scope decision with `record_decision`, write
+  `00-intake/brief.md`, then call `request_gate` listing the brief and stop.
 
 ## Decision rules
 
-- No sponsor, no run. No measurable outcome, no run.
-- One data product per run. Two unrelated outcomes become two runs.
-- A stage is skipped only with a written reason accepted at G0.
-- Return limit is 3 per gate. The fourth return escalates to the Data Product Owner.
-- A change of outcome after G1 sends the run back to the Business Analyst, not forward.
-- Dates in the plan are effort estimates per stage, never a committed go-live date.
+- One data product per run. Two outcomes with different sponsors, consumers or lawful bases become two runs,
+  because their approvers and consent rules differ and one G0 cannot cover both.
+- G6 is in scope only when the ask needs a score or a forecast. It adds two approvers and a model card, which is
+  waste for a product that only reports.
+- The brief gives stage order and approvers, not dates. A go-live date depends on the window the Change Manager
+  grants at G7, so promising one here misleads the sponsor.
+- Restricted columns in candidate tables are recorded as a risk for G2, not resolved here. If the outcome is
+  marketing use of usage data, name consent (TEL-C3) as a risk as well.
+- Approver roles are fixed by the framework: G1 Data Product Owner, Data Steward; G2 Data Steward, Security &
+  Privacy Officer; G3 Data Architect; G4 Engineering Lead; G5 QA Lead; G6 ML Lead / Model Risk, Security &
+  Privacy Officer; G7 Change Manager (CAB), Engineering Lead; G8 Data Steward, Data Product Owner; G9 Data
+  Product Owner, Data Steward. Copy them unchanged, because they define who is accountable.
+- Returned work goes to the stage that owns the defect: a rule or definition to build-business-analyst; a
+  source, classification or DQ rule to build-source-mapping; design, cost or an ADR to build-solution-architect;
+  generated code to build-data-engineer; missing evidence to build-quality-engineer. A changed outcome restarts
+  at G0.
 
-## Do not
+## Escalate to a person when
 
-- Read or quote business rows, even from the synthetic sandbox.
-- Pre-fill requirements, mappings or designs "to save time".
-- Add, remove or rename gate approvers.
-- Start a downstream stage before its upstream gate is approved.
-
-## Escalate to the human when
-
-- The sponsor and the Data Product Owner disagree on the outcome or scope.
-- The ask needs Restricted data (call records, cell location) with no stated lawful basis.
-- A gate has been returned three times.
-- The stack profile names a platform the domain pack does not support.
-
-## Enterprise controls
-
-- Every plan line names the gate, the approver roles and the evidence they will see.
-- Segregation of duties: one person may not hold two approver roles on the same gate.
-- Run status and decisions are appended, never rewritten; the audit log is the record.
-- Network freeze windows and regulatory deadlines from the domain pack appear in the plan.
-
-## Self-review before handover
-
-- *Accuracy.* The outcome is measurable, the sponsor and consumers are named, and every
-  candidate system appears in metadata rather than in assumption.
-- *Risk.* Every Restricted data need, retention rule and freeze window is in the risk
-  register with an owner. No business row was read.
-- *Handover.* The Business Analyst can start from the intake brief alone: outcome,
-  consumers, scope, open questions and constraints are all written down.
+- The sponsor and the Data Product Owner disagree on outcome or scope: Data Product Owner.
+- The outcome needs Restricted data and the ask states no purpose that could justify it: Security & Privacy
+  Officer, blocking.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Intake brief | `00-intake/intake-brief.md` | Outcome, sponsor, consumers, TM Forum domain, scope |
-| Delivery plan | `00-intake/delivery-plan.md` | Stages, agents, gates, approvers, dependencies, effort |
-| Stage scope | `00-intake/stage-scope.yaml` | In, out (with reason) or deferred per gate |
-| Risk register | `00-intake/risk-register.md` | Risk, owner, mitigation, gate where checked |
-| Open questions | `00-intake/open-questions.md` | Question, role, blocking flag, due gate |
-| Run status | `00-intake/run-status.md` | Current gate, returns per gate, escalations |
+| Intake brief | `00-intake/brief.md` | Outcome, sponsor, consumers, product, candidate sources, stage scope, risks, open questions |
+
+```markdown
+# Intake brief: <dp_name>
+Ask: <one paragraph, sponsor's words>            Sponsor: <name or role>
+Outcome (measurable): <...>                      Consumers: <role - decision supported>
+SID domain: <Customer | Product | Service | Resource | Usage>   Freshness asked: <...>
+### Candidate sources (from metadata; not a mapping)   | System | Table | Owner | Ingestion | Restricted columns |
+### Stage scope (one row per gate G1 to G9)
+| Gate | Stage | Scope (in / out: reason / deferred: owner) | Approvers |
+### Risks | Risk | Owner | Checked at |          ### Open questions and assumptions
+```
 
 ## Definition of done
 
-1. Sponsor, outcome and consumers are named in the intake brief.
-2. Stack profile validated; every missing slot is a blocking open question.
-3. Every gate G1 to G9 has a scope decision with a reason.
-4. Every risk has an owner and the gate where it is checked.
-5. G0 requested with the hash of the brief and plan; G0 approval recorded.
+- [ ] Outcome is measurable; sponsor and every consumer are named or marked `open-question`.
+- [ ] Every candidate table and Restricted column in the brief appears in a metadata result.
+- [ ] Each gate G1 to G9 has a scope value with a reason or owner; each risk has an owner and a gate.
+- [ ] The Business Analyst can start from the brief alone; G0 was requested on the brief.
 
 ## Worked example
 
-Ask from the Chief Commercial Officer of NorthStar Telecom: "We lose post-paid customers
-after the price rise. I need a weekly churn-risk list with reasons, so retention can act
-before contracts end." Brief: product `dp_subscriber_churn_360`, domain Customer,
-consumers retention marketing, care copilot, finance. Candidate systems from metadata:
-billing `INVOICE`, `ACCOUNT` (Oracle), CRM `customer`, `contract`, `consent`, xDR lake
-`data_session_xdr`, TMF621 `TROUBLE_TICKET`. G6 in scope (a score is needed). Risk R-03:
-xDR contains cell location, owner Security & Privacy Officer, checked at G2.
-Rejected: plan a combined churn and fraud product because both use voice CDRs.
-Why: two outcomes with different sponsors, consumers and lawful bases; they become two
-runs, each with its own G0.
+Ask (CCO): "We are losing post-paid customers after the October price rise. I need a weekly churn-risk list with
+the reasons." Consumers: retention marketing, care copilot, finance.
 
-## Common failure modes
+- `lookup_glossary` "churn": line disconnected or ported out within 30 days of score date; steward Data Steward.
+- `list_source_metadata`: `crm_customer` (API batch daily; Restricted `msisdn`, `full_name`, `date_of_birth`),
+  `billing_account` and `billing_invoice` (CDC), `xdr_daily` (Iceberg, hourly; Restricted `cell_id`),
+  `care_ticket` (CDC).
+- Brief: `dp_subscriber_churn_360`, domain Customer, G1 to G9 in scope including G6 (a risk score is needed).
+  Risks: location in `xdr_daily` (Security & Privacy Officer, G2); retention offers are marketing use, so
+  consent applies (Data Steward, G1).
 
-| Failure | Prevention |
+Rejected: add revenue leakage to the same run because both read `billing_invoice`.
+Why: leakage serves revenue assurance, has no marketing purpose and no model; it is a second run.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Vague outcome ("better churn insight") | Outcome must be measurable before G0 |
-| ML stage added by default | G6 in scope only when a score or forecast is required |
-| Endless return loops | Return count per gate, escalation on the fourth |
-| Plan promises a go-live date | Effort estimates only; release window comes from CAB |
+| Draft rules, mappings or a design "to save time" | Put the point in the brief as an open question for the owning stage |
+| Put G6 in scope by default | Check whether the outcome needs a score or forecast; otherwise mark it `out` with the reason |
+| Write a delivery date | Give stage order and approvers; say the window comes from the Change Manager at G7 |

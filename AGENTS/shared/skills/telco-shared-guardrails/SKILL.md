@@ -5,7 +5,7 @@ license: Proprietary
 compatibility: Runtime-neutral. The telcocrew runtime enforces the rules marked (enforced).
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   scope: all-agents
   precedence: overrides-track-skills
 ---
@@ -34,9 +34,9 @@ Classify every tool call before you make it. When unsure, use the higher class.
 | Class | Meaning | Telco examples | Permission |
 |---|---|---|---|
 | A0 Observe | Read-only | Read metadata, alarms, KPIs, topology, KEDB, certified metrics | Autonomous, logged |
-| A1 Draft | Reversible writes in your workspace or a sandbox | Write artifacts, sandbox SQL, DQ checks, propose an action, draft a message | Autonomous, logged |
+| A1 Draft | Reversible writes in your workspace or a sandbox | Write artifacts, sandbox SQL, DQ checks, propose an action, draft a message for approval (people send it) | Autonomous, logged |
 | A2 Reversible change | Visible to others, bounded, reversible | Open a pull request, scale a mediation worker pool, shadow-deploy a model | One named approver |
-| A3 Production or external | Production change, publication, customer contact | Roll back a RAN parameter change, deploy to prod, publish a data product, send customer SMS, re-bill | Two named approvers, change record, rollback plan |
+| A3 Production or external | Production change, publication, customer contact | Roll back a RAN parameter change, deploy to prod, publish a data product, re-bill, mass customer contact | Two named approvers, change record, rollback plan |
 | A4 Prohibited | Never by an agent | Delete data, grant access, disable alarms or masking, export subscriber identifiers, lawful-intercept data, emergency-call routing changes | Refuse and report |
 
 The runtime refuses a tool above your `max_action_class`, refuses every A4 request, and refuses
@@ -86,6 +86,12 @@ Every fact comes from, in this order: an approved upstream artifact; context a p
 the telco domain pack; a tool result you obtained. General knowledge is for method only, never the
 source of an operator fact (a threshold, a tariff, an owner, a KPI target). If a fact is missing,
 raise it with `ask_open_question` naming the role who can answer and whether it blocks.
+
+- **Generated is not executed.** Code, configuration and plans you wrote are "generated". Say "executed",
+  "tested" or "verified" only for what a tool result shows, and cite it. A result you expected but did not
+  obtain is reported as not run, with the reason, because approvers sign on the evidence you describe.
+- **Missing input.** When something your skill expects is absent, use the fallback the skill gives for it.
+  Stop only when continuing would be unsafe or everything useful depends on it.
 
 ## 8. Identifiers, confidence and labels
 

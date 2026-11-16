@@ -46,6 +46,14 @@ def main(argv: list[str] | None = None) -> int:
     dm.add_argument("--model", help="Override every agent's model (e.g. claude-sonnet-5-5 for a faster demo)")
     dm.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"], help="Override every agent's effort")
     dm.add_argument("--auto-approve", action="store_true", help="Simulated approvers sign every request")
+    ev = sub.add_parser("eval", help="Run the behaviour evals in evals/cases.yaml (simulator, or live to tune the skills)")
+    ev.add_argument("--mode", choices=["live", "simulator"])
+    ev.add_argument("--agent")
+    ev.add_argument("--track", choices=["build", "operate", "consume"])
+    ev.add_argument("--case")
+    ev.add_argument("--model")
+    ev.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"])
+    ev.add_argument("--judge", action="store_true", help="Also grade each case's rubric with Claude (live mode)")
     pf = sub.add_parser("preflight", help="Check SDK, key, model access and inputs before a live demo")
     pf.add_argument("--model", default="claude-opus-5-5")
     mf = sub.add_parser("manifest", help="Write the agent catalog for the static web demo")
@@ -107,6 +115,23 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {t:<24} {v['rows']:>7} rows  {v['system']:<10} {v['classification']}")
         print(f"  reference: {', '.join(m['reference'])}\n  operations: {', '.join(m['operations'])}")
         return 0
+    if a.cmd == "eval":
+        from .evals import run_evals
+        from .llm import live_available
+        mode = a.mode or ("live" if live_available() else "simulator")
+        out = run_evals(mode, a.agent, a.track, a.case, a.model, a.effort, a.judge)
+        for r in out["results"]:
+            score = f"  rubric {r['rubric_score']}" if "rubric_score" in r else ""
+            print(f"  [{'pass' if r['passed'] else 'FAIL'}] {r['id']:<30} {r['agent']:<30} {r['seconds']:>6}s{score}")
+            for f in r["failures"]:
+                print(f"         - {f}")
+            for i in r.get("rubric", []):
+                if not i["met"]:
+                    print(f"         rubric not met: {i['criterion']} ({i['evidence'][:120]})")
+        print(f"\n{out['passed']}/{out['cases']} passed in {mode} mode"
+              + (f"; {len(out['skipped_live_only'])} live-only cases skipped" if out["skipped_live_only"] else "")
+              + (f"\nDetails: {out['out_dir']}" if out.get("out_dir") else ""))
+        return 0 if out["passed"] == out["cases"] else 1
     if a.cmd == "scenarios":
         from .inputs import list_scenarios
         for sc in list_scenarios():

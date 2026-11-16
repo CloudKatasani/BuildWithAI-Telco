@@ -1,11 +1,11 @@
 ---
 name: consume-exec-briefing
-description: Writes the weekly cross-domain steering brief from certified metrics only - headline, trend per domain, the reason at its stated confidence, and decisions needed with pending ACT-### proposals and approvers. Use every week before the steering meeting, or when the executive team asks for an out-of-cycle update.
+description: Writes the weekly steering brief from certified metrics only - headline, one line per domain with the figure, the comparison available, the reason at its stated confidence, labelled estimates and the decisions needed with their approvers - plus an evidence appendix. Use before the weekly steering meeting or when the executive team asks for an out-of-cycle update across churn, revenue assurance, enterprise SLA and network energy.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs list_metrics, query_metric, get_lineage, lookup_glossary, record_decision and ask_open_question.
+compatibility: Load telco-shared-guardrails and telco-domain-pack first. Uses list_metrics, query_metric, get_lineage, lookup_glossary, read_artifact, write_artifact, record_decision and ask_open_question.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: consume
   role: executive-reporter
   gate: none
@@ -17,127 +17,109 @@ metadata:
 
 ## Mission
 
-Give NorthStar Telecom's steering group one honest page a week: where the business
-stands, why it moved, and which decisions are waiting for them.
+Give the steering group one honest page: where the business stands, what is known about why, and which
+decisions are theirs. They act on it without reading the evidence, so nothing on the page may outrun it.
 
 ## Use when
 
-- The weekly steering brief is due.
-- The executive team asks for an out-of-cycle update after a major incident or price change.
-- A board pack needs the same figures with evidence.
+- The weekly steering brief is due, or the executive team asks for an out-of-cycle update across domains.
 
-## Do not use for
-
-- Answering one-off questions (Ask-Your-Data).
-- Investigating why a metric moved (Insight Scout).
-- Proposing or prioritising actions for approval (Next-Best-Action and the approvers).
+Not for: a single question (Ask-Your-Data); finding drivers (Insight Scout); sizing or proposing actions
+(Next-Best-Action); one account's review (Enterprise Account); the Operate service report (Service Reporting).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| Certified steering metrics per domain (`list_metrics`, tag steering) | yes |
-| This week's insight digest from `consume/insights/` | yes |
-| Open ACT-### proposals and their approval status from `consume/actions/` | yes |
-| Operate service report: major INC-###, MTTR, autonomy level per scenario | no |
-| Last week's brief from `consume/briefings/` | no |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Domains requested | Task text | Cover all four in the fixed order under Decision rules |
+| Steering figures, SQL, lineage, freshness | `list_metrics`, `query_metric` | Show the line as "no certified figure this week" with the reason; do not drop it |
+| A comparison period | `month` dimension of `leakage_eur`; last week's `consume/briefings/week-<nn>.md` via `read_artifact`; attached context | Write "snapshot, no prior period" on that line; give no direction of travel |
+| Reasons for a figure | `consume/insights/weekly.md` via `read_artifact` | Write "reason not established"; do not supply one |
+| Pending proposals and approvals | `consume/actions/proposal.md` via `read_artifact` | List decisions as questions for a named role, marked "no proposal yet" |
 
-## Tasks
+## Workflow
 
-1. **Check freshness** of every steering metric with `list_metrics` and `get_lineage`.
-   A stale metric is shown as stale, not dropped silently.
-2. **Pull the figures** with `query_metric`: this week, last week, 8-week baseline, for
-   commercial (at-risk MRR, churn risk), network (idle-night energy, availability), revenue
-   assurance (leakage), care (contact volume, first-contact resolution), enterprise (SLA
-   credit exposure).
-3. **Attach the reason** from the matching insight card with `read_artifact`, keeping its
-   confidence and wording ("associated with" stays "associated with").
-4. **List decisions needed**: pending ACT-### and Operate changes, value (estimate label
-   kept), approvers, and how long each has been waiting.
-5. **Write the headline**: the two or three things that matter most this week, by value
-   at stake.
-6. **Resolve terms** with `lookup_glossary` so every label uses the certified business name.
-7. **Write the brief** and evidence appendix to `consume/briefings/` with `write_artifact`.
-8. **Record and raise**: `record_decision` for figures excluded and why; `ask_open_question`
-   to the metric owner for any stale or conflicting metric.
+1. List the workspace with `read_artifact` and read last week's brief, insight cards and proposals if present.
+   A fresh workspace is normal; the brief is then built from metrics alone and says so.
+2. Query every steering metric with `query_metric`, total first and then by the dimension that shows where it
+   sits. Check freshness on each result; on a filter error re-run with a dimension from `allowed_dimensions`.
+3. Attach reasons and decisions only from the artifacts read in step 1, at their stated confidence.
+4. Write the headline last (the two or three lines with the most value at stake), then write
+   `consume/briefings/week-<nn>.md` with `write_artifact`; `<nn>` is the ISO week of the freshness date unless
+   the request names a week. Log excluded figures with `record_decision`; raise stale or conflicting metrics
+   with `ask_open_question`. Hand off as `done`; no approval is requested.
 
 ## Decision rules
 
-- Same steering metrics in the same order every week; a change to the set is recorded.
-- A figure without a certified metric is left out and the gap noted.
-- Model-based figures (forecasts, savings scenarios, expected value) carry "estimate".
-- The reason keeps the insight's confidence; no insight card means "reason not yet known".
-- Decisions needed come only from submitted ACT-### or Operate changes; the brief does not
-  create new proposals.
-- One page for the body; detail goes in the appendix.
+- The steering set is fixed so weeks stay comparable: commercial (`churn_at_risk_lines`, `at_risk_arpu`,
+  `churn_rate_30d`, by `region` and `value_segment`); revenue assurance (`leakage_eur` by `month`, `leak_point`);
+  enterprise (`accounts_breach_forecast`, `sla_credit_exposure_eur`); network energy (`idle_night_kwh`,
+  `sleep_candidate_cells`, by `cluster`). Care and network quality have no certified metric: say so on the page.
+- A direction ("up", "down", a percentage change) needs two periods of the same metric: only leakage has
+  months, the rest need last week's brief. A snapshot is reported as a level and a ranking.
+- Wording follows the metric: `at_risk_arpu` is monthly revenue of lines at risk, not revenue that will be
+  lost; `sla_credit_exposure_eur` is "if the month closed now"; at-risk lines are not churned lines.
+- Anything computed beyond a certified value (annualising, a saving, a share) is marked "estimate" with its
+  arithmetic in the appendix, because the group cannot tell a measured figure from a projected one otherwise.
+- A reason keeps the confidence and the verb of its insight card: "associated with" stays "associated with".
+- Decisions needed list pending proposals with ACT id, value as an estimate, approvers and approval id, as
+  pending. The brief does not recommend approval or create proposals; a decision with no proposal is phrased
+  as a question for a named role and pointed to Next-Best-Action.
+- Suppressed groups appear as "suppressed (<10)" and are not sized by subtraction. Accounts appear as counts and totals, by
+  name only where a decision depends on it. The body fits one page: bad news stays, detail goes to the appendix.
 
-## Do not
+## Escalate to a person when
 
-- Smooth, annualise or combine figures in ways the certified metric does not define.
-- Present an action as recommended for approval; present it as pending with its approvers.
-- Name customers, enterprise contacts or staff; enterprise accounts appear only as counts
-  unless the steering group's role allows account names.
-- Leave out bad news to keep the page short.
-
-## Escalate to the human when
-
-- A steering metric is stale for two weeks running (Data Product Owner).
-- Two domains report conflicting figures for the same thing (Data Product Owner).
-- A pending action has waited past its approval service level (the named approver).
-
-## Enterprise controls
-
-- Certified metrics only; the appendix lists metric, lineage and freshness for each figure.
-- Confidence and estimate labels are carried through unchanged from source cards.
-- Briefs are versioned by week and never rewritten after the meeting.
-- Role-based access applies to the steering audience as a group.
-
-## Self-review before handover
-
-- *Accuracy.* Every figure matches its certified metric for the stated week, and week
-  on week changes are calculated from the same definition.
-- *Risk.* No uncertified number, no upgraded confidence, no named individual, and every
-  estimate is labelled.
-- *Handover.* A steering member can read the body in three minutes and knows which
-  decisions are theirs and who else must approve.
+- A steering metric is stale, its lineage is incomplete, or two figures conflict: Data Product Owner, blocking
+  for that line, which is published as "under review" rather than dropped.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Steering brief | `consume/briefings/brief-<week>.md` | Headline, domain trends, why, decisions needed |
-| Evidence appendix | `consume/briefings/brief-<week>-evidence.md` | Metric, SQL, lineage, freshness per figure |
-| Decision log entry | via `record_decision` | Excluded figures and set changes |
+| Steering brief | `consume/briefings/week-<nn>.md` | Body and evidence appendix in the shape below |
+
+```
+# Steering brief, week <nn> (data as of <freshness>)
+**Headline:** <two or three lines, most value at stake first>
+| Domain | Figure | Against | Why (confidence) | Source metric |
+|---|---|---|---|---|
+| Commercial | <value or ordering> | <prior period | snapshot> | <reason | reason not established> | <metric> |
+**Decisions needed:** <ACT id, action, value (estimate), approvers, approval id, pending> | <question, role, no proposal yet>
+**Gaps:** <domains with no certified metric; stale or missing lines; what was not provided>
+**Appendix:** per figure: metric, SQL, lineage, freshness; arithmetic for each estimate
+```
 
 ## Definition of done
 
-1. Every steering metric is present or marked stale or missing.
-2. Each movement has a reason with its confidence, or "reason not yet known".
-3. Estimates are labelled.
-4. Decisions needed list ACT-### or change ids, value and approvers.
-5. The evidence appendix covers every figure in the body.
+- [ ] Every figure in the body comes from a `query_metric` result of this run and has an appendix entry.
+- [ ] Every line is marked with its comparison or "snapshot"; no direction is claimed without two periods.
+- [ ] Every reason cites an insight card at its confidence, or reads "reason not established".
+- [ ] Estimates are labelled; decisions are pending with approvers or questions with a role; gaps are listed.
 
 ## Worked example
 
-Week 46 headline:
+Request: "Write this week's steering brief: churn and revenue at risk, revenue leakage, enterprise SLA
+exposure, and the decisions needed." Fresh workspace, no attachments.
+- `read_artifact` with no path: no earlier brief, insight cards or proposals. `churn_at_risk_lines` by
+  `region`: North-East highest, then Metro-North; Coastal suppressed (<10). `at_risk_arpu` by `value_segment`:
+  Mid and High carry most of it. Both lines: "snapshot, no prior period".
+- `leakage_eur` by `month`: 2026-10 lower than 2026-09; by `leak_point`: Rated, not billed (roaming data) is the
+  largest in both months. This is the one line with a direction.
+- `accounts_breach_forecast` and `sla_credit_exposure_eur` by `account`: most accounts forecast to breach,
+  about half the exposure in the top two; worded "if the month closed now".
+- Decisions needed: none pending; two questions, each "no proposal yet": retention in the two regions (Campaign
+  Manager) and review of the forecast breaches (Service Delivery Manager).
 
-> 1. Monthly revenue at risk EUR 2.31M (3.4% of post-paid MRR), up from EUR 2.05M.
-> Associated with bill shock after the 1 November price rise (Medium). Decision needed:
-> ACT-014 retention offer, EUR 29.0k MRR protected (estimate), waiting on Campaign
-> Manager and Security & Privacy Officer.
-> 2. October leakage EUR 184k, down 22% on September; 61% roaming data rated but not
-> billed. Decision needed: ACT-015 re-bill EUR 112k, Data Product Owner and Change Manager (CAB).
-> 3. SLA credit exposure EUR 58.2k if November closed now, versus EUR 21.0k in October.
+Rejected: headline "Network incident drove churn up in Metro-North; approve the retention offer."
+Why: with no prior week nothing is shown to be up, no insight card supports the cause, and the brief lists
+decisions as pending or as questions rather than recommending approval.
 
-Rejected: headline "Price rise drove churn up 34%; approve the retention offer today."
-Why: the insight is an association at Medium confidence on risk score, not churn, and
-the brief presents decisions as pending with their approvers rather than recommending them.
+## Red flags
 
-## Common failure modes
-
-| Failure | Prevention |
+| If you are about to | Do this instead |
 |---|---|
-| Story outruns evidence | Confidence carried unchanged from insight cards |
-| Figures not comparable week to week | Fixed steering set and certified definitions |
-| Stale data presented as current | Freshness check first; stale shown as stale |
-| Bad news dropped | Every steering metric shown every week |
+| Write a week-on-week change for a metric with one snapshot | Mark the line "snapshot, no prior period" |
+| Supply the obvious reason for a figure | Cite an insight card at its confidence or write "reason not established" |
+| Annualise revenue at risk into a loss figure | Keep the certified monthly value; if a projection is asked for, label it an estimate with arithmetic |
+| Recommend that the group approve an action | List it as pending with its approvers, or as a question for a named role |

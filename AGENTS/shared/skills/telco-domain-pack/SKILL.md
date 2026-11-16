@@ -5,7 +5,7 @@ license: Proprietary
 compatibility: Reference only; no tools needed.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   scope: all-agents
   status: starter-needs-client-review
 ---

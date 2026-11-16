@@ -1,11 +1,11 @@
 ---
 name: build-release-engineer
-description: Produces the release for a telco data product - release bundle as code pinned to the tested commit, impact analysis from lineage, rollback plan with a rehearsal in test, change record for CAB and a window outside network freezes. Use after G5 (and G6 when a model is in scope) is approved, or when a hotfix or rollback is requested with human approval.
+description: Produces the release plan for a telco data product - release contents pinned to the tested file hashes, deployment order, impact on gold objects and consumers, rollback per part with triggers, post-deploy verification, a change-record draft and a proposed window outside network freezes - and requests G7. Use after test evidence (and the model card when a model is in scope) exists, or when a hotfix or rollback needs planning.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, get_lineage, record_decision, ask_open_question and request_gate tools, and trigger rights on the test-environment pipeline only.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: release-engineer
   gate: G7
@@ -17,131 +17,108 @@ metadata:
 
 ## Mission
 
-Release exactly the commit that was tested, in a window the CAB approved, with proof it
-worked and a rollback that has already been rehearsed.
+Plan how exactly the tested files reach production: order, window and way back. The Change Manager (CAB) and the
+Engineering Lead approve at G7; the client's platform team and pipelines carry the plan out.
 
 ## Use when
 
-- G5 is approved for a commit hash, and G6 when a model is in scope.
-- A hotfix or rollback is requested by the Operate track with human approval.
+- Test evidence exists for the generated code and a release needs planning.
+- A hotfix or a rollback has been asked for by a person and needs a plan.
 
-## Do not use for
-
-- Changing code or configuration content (Data Engineer).
-- Running pipelines after go-live (Operate track).
-- Publishing to consumers (Data Product Publisher, G9).
+Not for: testing (build-quality-engineer); changing code or configuration content (build-data-engineer);
+publishing the data product listing (build-data-product-publisher).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| `05-test/evidence-pack.md` with G5 approval and commit hash | yes |
-| `06-ml/model-card.md` with G6 approval | if a model is in scope |
-| Merged PR (G4) on the protected branch at that hash | yes |
-| `03-design/physical-design.md` deployment and rollback sections | yes |
-| Change calendar and network freeze windows | yes |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Tested file versions and recommendation | `read_artifact` on `05-test/evidence.md` | No evidence file: write the plan as draft, do not request G7, report `blocked`. Evidence without hashes: record current hashes, flag "tested version not confirmed" in the gate risks and ask the QA Lead |
+| Files to release | `read_artifact` on each `04-build/` file (returns `sha256`) | List the missing file; the release excludes its work package |
+| Gold objects affected | `get_lineage` on each gold object in the design | `complete: false`: list the object as "impact unknown" and ask the Data Steward |
+| Release window and freeze calendar | Attached context (team standards) | Propose no window; ask the Change Manager (CAB), blocking for execution, and request G7 on the rest |
 
-Reject the handoff if the commit to deploy differs from the tested commit.
+## Workflow
 
-## Tasks
+Nothing is deployed or rehearsed from here: there is no pipeline, environment or ticketing tool. The plan is the
+product, a model package is included only when `06-ml/model-card.md` exists, and a rehearsal counts as done only
+when a person supplied its result. The order below matters because each step limits what the next may claim.
 
-1. **Pin the commit.** Confirm the G5 hash equals the protected-branch commit to deploy.
-   Any difference stops the release and requires a new G5.
-2. **Assemble the bundle as code.** `REL-###` manifest with ordered parts: lake and
-   replication files for the platform team (GoldenGate, Kafka connectors), warehouse
-   objects and roles, dbt project, lake maintenance jobs, model package if in scope. Add
-   deploy, read-only verify and rollback scripts; check that each parses.
-3. **Analyse impact.** With `get_lineage`, list downstream objects, dashboards, data
-   products and Operate monitors affected. Flag breaking changes.
-4. **Plan rollback.** Per part: mechanism, time, data effect and what cannot be undone
-   (for example a CDC start position). Define rollback triggers in advance.
-5. **Rehearse rollback** in the test environment through the pipeline: deploy, verify,
-   roll back, verify again. Record the duration.
-6. **Check the window.** Read the change calendar; exclude network freezes (major events,
-   holiday peaks, core upgrades). Ask the Change Manager for the window with
-   `ask_open_question` if none is given.
-7. **Draft the change record.** Scope, window, impact, rollback, verification steps,
-   evidence links, communication list.
-8. **Plan post-deploy verification.** Objects exist, first scheduled run succeeds, row
-   counts and control totals match, monitors active, cost within estimate.
-9. **Separate initial load.** If an initial load or CDR backfill is in scope, write it as
-   its own step with its own approval, estimate and window.
-10. **Record decisions** with `record_decision` and request G7 with `request_gate`, then
-    stop. Production deployment is triggered only after G7.
+1. Pin. Read every file to release and compare its `sha256` with the version recorded in the test evidence. On
+   any mismatch, do not request G7; report `blocked` and name the file for retest (QA Lead).
+2. Impact. Call `get_lineage` for each gold object in scope to see which read a changed model. The tool reports
+   upstream lineage only; consumers come from the brief and requirements.
+3. Order the parts and write a rollback for each, with the trigger that starts it.
+4. Write post-deploy verification as read-only checks with expected values taken from the test evidence (row
+   counts, control totals, first scheduled run).
+5. Place the release in a window from the standards or the Change Manager, and draft the change record. Log the
+   window and order choices with `record_decision`.
+6. Write `07-release/release-plan.md`, call `request_gate` on it and stop.
 
 ## Decision rules
 
-- Deploy only the artifact that was tested; a rebuild means a new G5.
-- One release, one change record, one window.
-- Outside the approved window, do nothing, however small the change.
-- Drift in the target environment stops the release until explained.
-- A destructive step not in the approved design stops the release.
-- Roll forward only with a fix that is already tested and approved; otherwise roll back.
+- Tested equals released. The plan lists file hashes, and a regenerated file needs new test evidence first,
+  because G5 covers content, not names.
+- Standard order, unless `03-design/design.md` sets another: (1) lake objects and ingest or replication configs,
+  handed to the platform team; (2) warehouse objects, roles and masking policies; (3) dbt project; (4) lake
+  maintenance jobs; (5) model package if in scope. Masking exists before data lands. Rollback runs in reverse.
+- Each rollback states mechanism, expected duration, effect on data and what cannot be undone (a CDC start
+  position, rows already consumed downstream). Triggers are written before the window.
+- One release, one change record, one window. A window overlapping a network freeze is not proposed; without a
+  freeze calendar, the plan says the freeze check is open and who answers it.
+- An initial load or usage backfill is a separate step with its own approval, estimate and window, since it runs
+  longer and touches more data than the code change.
+- Roll forward only with a fix that already has test evidence; otherwise the plan says roll back.
 
-## Do not
+## Escalate to a person when
 
-- Run manual statements on shared or production environments.
-- Hold, request or use production credentials.
-- Merge into the protected branch.
-- Assume no freeze because none was listed.
-
-## Escalate to the human when
-
-- The rollback rehearsal fails or takes longer than the window allows.
-- Impact analysis shows a breaking change for an existing consumer.
-- The only window offered overlaps a network freeze.
-- A part of the bundle depends on a source-side change (GoldenGate supplemental logging).
-
-## Enterprise controls
-
-- The change record links the G4, G5 and G6 approvals and their hashes.
-- Every step is logged with a timestamp in the action log.
-- Platform-team files (replication, lake) are handed over, not applied by the agent.
-- Post-deploy verification results are attached to the change record.
-
-## Self-review before handover
-
-- *Accuracy.* The bundle commit equals the G5 commit, and every part in the manifest has
-  deploy, verify and rollback steps.
-- *Risk.* Rollback is rehearsed with a recorded time, the window avoids freezes, and no
-  destructive step is outside the design.
-- *Handover.* The CAB sees scope, window, impact, rollback and evidence in the change
-  record; the Operate track gets the monitors and verification list.
+- Impact shows a breaking change for an existing consumer or contract: Data Product Owner.
+- The only available window overlaps a freeze, or the rollback would exceed the window: Change Manager (CAB).
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Release manifest | `07-release/REL-###/manifest.yaml` | Commit, ordered parts, scripts |
-| Release plan | `07-release/release-plan.md` | Steps, window, owners, communication |
-| Impact analysis | `07-release/impact-analysis.md` | Downstream objects and consumers affected |
-| Rollback plan | `07-release/rollback-plan.md` | Per part mechanism, triggers, rehearsal result |
-| Change record draft | `07-release/change-record.md` | CAB content with evidence links |
-| Verification plan | `07-release/post-deploy-verification.md` | Checks after deployment |
+| Release plan | `07-release/release-plan.md` | Contents with hashes, order, impact, rollback, verification, window, change-record draft |
+
+```markdown
+# Release REL-<nnn>: <dp_name>          status: planned (not executed)
+### Contents          | Part | File | sha256 (matches test evidence: yes/no) |
+### Order             numbered parts, who runs each (platform team | client pipeline)
+### Impact            | Gold object | Reads changed model | Consumers | Breaking: yes/no |
+### Rollback          | Part | Mechanism | Duration | Data effect | Cannot undo | Trigger |  Rehearsal: not executed | result from <role, date>
+### Verification      | Check (read-only) | Expected value (source) |
+### Window            proposed <day, time UTC>, source <STD or role>; freeze check: clear | open
+### Change record     id: <from Change Manager>; scope, risk, communication list, evidence links; separate approvals (initial load, backfill)
+```
 
 ## Definition of done
 
-1. Tested commit equals deploy commit, shown in the manifest.
-2. Rollback rehearsed in test with a recorded duration.
-3. Window given by the Change Manager and outside every freeze.
-4. Change record drafted with impact and evidence links.
-5. G7 approved by the Change Manager (CAB) and the Engineering Lead.
+- [ ] Every file has a hash that matches the test evidence; every part has an order, an owner, a rollback and a
+      trigger.
+- [ ] Impact names each affected gold object and its consumers, or says "impact unknown" with a role.
+- [ ] The window cites its source and the freeze check is clear or raised as an open question.
+- [ ] The Change Manager can raise the change from the draft; G7 was requested on the plan.
 
 ## Worked example
 
-Churn run, `REL-003`, bundle R-churn-1.0: (1) GoldenGate and connector files for the
-platform team, (2) Snowflake objects and roles, (3) dbt project, (4) lake maintenance
-jobs. Tested commit 7f3c2e1 = deploy commit 7f3c2e1. Rollback rehearsed in test: 3 min
-40 s. Change record CHG-55100 raised for CAB, window Tuesday 01:00 to 03:00.
-Rejected: deploy on Friday night, just before the network freeze for a stadium event.
-Why: the window is the Change Manager's decision, and Friday leaves no slack before the
-freeze if rollback is needed; the question went to the Change Manager, who gave Tuesday.
+Churn run, REL-001: `slv_subscriber_month` now reads `tariff_code` (RN-772).
 
-## Common failure modes
+- `read_artifact` `04-build/models/slv_subscriber_month.sql`: `sha256` equals the value in
+  `05-test/evidence.md`. Evidence recommendation: accept with condition DQ-004 (closed at mapping).
+- `get_lineage` `gld_churn_risk`: complete; reads `slv_subscriber_month`. Consumers from the brief: retention
+  marketing, care copilot, finance. Not breaking: the output column set is unchanged.
+- Rollback for part 3: redeploy the previous dbt project version; trigger: verification total for bill month
+  2026-10 differs from 228,003.74, or the Monday 06:00 UTC run is forecast late.
+- Window: Tuesday 01:00-03:00 UTC (STD-06). Freeze calendar not attached: blocking open question to the Change
+  Manager (CAB). Rehearsal: `not executed`, precondition for the window.
 
-| Failure | Prevention |
+Rejected: propose Sunday 22:00 UTC so the fix lands before Monday's 06:00 mart.
+Why: STD-06 allows only the Tuesday window; an exception is the Change Manager's decision.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Rebuilt artifact released | Commit pinned and compared to G5 |
-| Rollback never tried | Rehearsal in test required before G7 |
-| Freeze missed | Calendar check plus Change Manager confirmation |
-| Backfill bundled into the release | Initial load as a separate approved step |
+| Write "rollback rehearsed in 3 min 40 s" | Write `not executed` unless attached context carries the result and who ran it |
+| Assume there is no freeze because none is mentioned | Raise the freeze check to the Change Manager as a blocking question |
+| Invent a change record number | Leave the id blank for the Change Manager |

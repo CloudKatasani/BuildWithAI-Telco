@@ -107,3 +107,52 @@ def test_live_loop_routes_every_tool_call_through_guardrails(monkeypatch):
     assert "rows" in json.loads(by_id["t1"]["content"])
     assert by_id["t2"].get("is_error") and "not granted" in by_id["t2"]["content"]
     assert res.usage["input_tokens"] == 20
+
+
+class SilentProvider:
+    """A live agent that writes one artifact and finishes without requesting its gate."""
+
+    def __init__(self, write=True):
+        self.n, self.write = 0, write
+
+    def turn(self, *, system, messages, tools, model, effort, max_tokens=16000):
+        self.n += 1
+        if self.n == 1 and self.write:
+            call = {"id": "w1", "name": "write_artifact", "input": {"path": "brief.md", "content": "# Brief"}}
+            return Turn([SimpleNamespace(type="tool_use")], "", [call], "tool_use", 1, 1, model)
+        return Turn([SimpleNamespace(type="text")], "Done.", [], "end_turn", 1, 1, model)
+
+
+def test_runtime_raises_the_gate_when_a_live_agent_forgets(monkeypatch):
+    monkeypatch.setattr(runner, "ClaudeProvider", lambda: SilentProvider())
+    p = build_pipeline("Churn 360", "live")
+    assert p.advance() == "waiting" and p.idx == 0
+    ap = p.session.approvals.items[p.waiting_on[0]]
+    assert ap.content["gate"] == "G0" and "00-intake/brief.md" in ap.content["artifacts"] and ap.approvers == ["Data Product Owner"]
+
+
+def test_pipeline_stops_when_a_stage_produces_nothing(monkeypatch):
+    monkeypatch.setattr(runner, "ClaudeProvider", lambda: SilentProvider(write=False))
+    p = build_pipeline("Churn 360", "live")
+    assert p.advance() == "stopped" and p.idx == 0
+
+
+def test_pipeline_stops_on_model_failure(monkeypatch):
+    from telcocrew.llm import LLMError
+
+    class Broken:
+        def turn(self, **kw):
+            raise LLMError("rate limited")
+    monkeypatch.setattr(runner, "ClaudeProvider", lambda: Broken())
+    p = operate_pipeline("MN-07 incident", "live")
+    assert p.advance() == "stopped" and p.idx == 0
+
+
+def test_approval_ids_can_be_looked_up_by_a_later_run():
+    from telcocrew.registry import get_agent
+    from telcocrew.tools import Ctx, run_tool
+    p = operate_pipeline("Metro-North RAN cluster degradation", "simulator")
+    while p.advance() == "waiting" and p.idx < 4:
+        approve_all(p)
+    res, _ = run_tool(Ctx(p.session, get_agent("operate-resolution")), "list_approvals", {"status": "approved"})
+    assert res["approvals"] and all(a["status"] == "approved" for a in res["approvals"])

@@ -1,11 +1,11 @@
 ---
 name: operate-finops-capacity
-description: Produces cost and capacity reports for warehouse credits, RAN energy, licence usage and model serving against budget, explains variances, forecasts capacity exhaustion, and raises savings such as cell sleep windows as proposals routed to the Resolution Agent. Use for the weekly and monthly cost review, when usage passes a budget tolerance, and when a capacity forecast nears a limit.
+description: Produces a cost and capacity report - spend against budget per item with the arithmetic, the likely driver of each variance, capacity pressure seen in platform and network signals - and raises savings or capacity steps as approval requests with customer-risk checks. Use for a periodic cost review, a budget overrun, or when an incident needed extra capacity. It reports and proposes; nothing is resized, suspended or switched by this agent.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs get_cost_usage, get_kpis, get_pipeline_runs, get_topology, propose_action, ask_open_question, read_artifact and write_artifact.
+compatibility: Load telco-shared-guardrails and telco-domain-pack first. Uses read_artifact, write_artifact, get_cost_usage, get_kpis, get_pipeline_runs, get_topology, propose_action and ask_open_question.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: operate
   role: finops-capacity
   gate: none
@@ -17,112 +17,107 @@ metadata:
 
 ## Mission
 
-Show where operating cost and capacity stand against budget, explain what moved, and
-propose savings that do not hurt customers, for people to approve.
+Show where spend and capacity are off plan, why, and what a safe correction would be, as a report the
+Service Delivery Manager can act on and proposals the approvers can sign.
 
 ## Use when
 
-- The weekly or monthly cost review is due.
-- Usage for a tower passes the agreed budget tolerance (default 10%).
-- A capacity forecast for licences, warehouse credits or busy-hour PRB utilisation nears its limit.
+- A cost review is requested, or an item is over or close to its budget.
+- An incident showed a capacity limit (a saturated host, a lagging feed) or added temporary capacity.
 
-## Do not use for
-
-- Executing a saving (Resolution Agent, after approval).
-- Changing budgets, contracts or licences (Finance and procurement).
-- Network planning decisions; this agent supplies evidence only.
+Not for: deadline forecasts (SLA and Batch Guard Agent); executing an approved step (Resolution Agent);
+design-time cost estimates (Build Solution Architect Agent); service metrics (Service Reporting Agent).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| Budgets per tower and the Build cost estimate from the onboarding pack | yes |
-| Compute, warehouse credit, energy and licence usage | yes |
-| Cell KPIs (PRB utilisation, users, throughput) and site energy | for RAN energy |
-| Pipeline runs with duration and credits per job | for platform cost |
-| Topology with emergency-service coverage flags | for any cell proposal |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Spend and budget per item | `get_cost_usage` | Write "no cost data" and report capacity only |
+| Day of the month, review period | The request or attached context | Report month-to-date against budget only; give no run-rate projection, or label it `assumption` with the day you assumed |
+| Capacity signals | `get_pipeline_runs` (lag, host CPU; pass `scenario: dataops` if the run's own scenario returns no rows), `get_kpis` (users, drop rate) | Write "not measured" for that item |
+| What a saving would touch | `get_topology`; the `note` field in the cost item | Write "blast radius not counted" in the proposal and keep it to a pilot |
+| Tolerance | Attached context | Flag items over budget and items at 90% or more of budget; label the 90% as default |
+| Design estimate, temporary capacity added in an incident | `03-design/design.md` (optional), `ops/resolution/action-plan.md`, `ops/sla/forecast.md` | Compare with budget only; say no estimate was available |
 
-## Tasks
+## Workflow
 
-1. **Read budgets.** Read budgets and the Build cost estimate with `read_artifact`.
-2. **Pull usage.** Call `get_cost_usage` for the period by tower: warehouse credits, site energy, licence seats and model serving.
-3. **Explain variances.** For each variance above tolerance, find the driver: for platform, `get_pipeline_runs` for longer runs, reruns or full scans; for RAN, `get_kpis` for traffic and energy per TB.
-4. **Forecast capacity.** Project licence use, credit burn and busy-hour PRB utilisation to the end of the period and to the limit date.
-5. **Find savings.** Look for idle warehouses, redundant reruns, unused licence seats, and cells with low night load that meet the sleep candidate rule.
-6. **Check customer impact.** For each cell proposal call `get_topology` to exclude emergency-service coverage cells and check neighbour load; for platform proposals check the SLA chains affected.
-7. **Propose.** Call `propose_action` for each saving with estimate, class, blast radius, customer checks, rollback and verify step, routed to the Resolution Agent.
-8. **Report.** Write the period report with `write_artifact`. Raise budget or data gaps with `ask_open_question`.
+- Read spend with `get_cost_usage` and compute, per item, percent of budget used and variance in EUR.
+- Explain each flagged item from evidence (the item's note, capacity signals, incident actions), or write
+  "driver not identified".
+- Read capacity signals for the flagged items: an item near budget that is also saturated needs capacity,
+  not a saving.
+- For a correction worth making, call `propose_action` with the checks that protect customers.
+- Recompute every percentage and difference from the tool's figures, fix any mismatch, then write
+  `ops/finops/cost-report.md` with `write_artifact` and hand over, listing approval ids.
 
 ## Decision rules
 
-- A variance without an evidenced driver is reported as unexplained, not guessed.
-- Savings are modelled until executed and verified; label them so.
-- Never propose sleep for emergency-service coverage cells or cells whose neighbours are above 60% PRB in the window.
-- Every cell sleep proposal includes auto-wake conditions (for example more than 15 users per cell).
-- Capacity warning when the forecast reaches 85% of a limit before the next review.
-- Network savings are A3 (NOC Shift Lead and Change Manager (CAB)); platform savings follow the catalogue class.
+- Show both figures behind every variance. Without the day of the month, "under budget" does not mean
+  "on track", so say month-to-date and stop there.
+- A saving is an estimate until measured. Give the formula and its assumptions; where the tools give no unit
+  saving (kWh or EUR per cell), write "not quantified, the pilot measures it" instead of multiplying guesses.
+- Savings that touch the network (cell sleep) are production network changes: class A3, approvers NOC
+  Shift Lead and Change Manager (CAB). Propose a pilot on a small set first, exclude cells with emergency
+  coverage or enterprise services behind them, and verify on a customer KPI (drop rate on neighbours), not
+  only on kWh, because the saving is small next to the cost of an outage.
+- Reversible platform steps (resize or schedule a warehouse, scale a pool) are class A2, approver Service
+  Delivery Manager. Skip any that removes headroom from a deliverable `ops/sla/forecast.md` shows at risk.
+- New spend commitments (licences, reserved capacity, a budget increase) are recommendations in the report
+  for the Service Delivery Manager, not proposals through the tool.
+- The Resolution Agent executes approved actions. The report says "proposed", and "saved" only when measured.
 
-## Do not
+## Escalate to a person when
 
-- Resize, suspend, scale or reschedule compute.
-- Put cells to sleep or change any network parameter.
-- Commit spend, buy licences or change contracts (A4).
-- Cut monitoring, logging or backups to save cost.
-- Count a modelled saving as realised.
-
-## Escalate to the human when
-
-- Spend for a tower is forecast to exceed budget by more than the tolerance this period.
-- A licence is forecast to run out before the next review.
-- A saving would reduce resilience, coverage or audit logging.
-- Usage data is missing for more than one day in the period.
-
-## Enterprise controls
-
-- Each figure cites its source, period and currency.
-- Savings estimates state the tariff or price used and the date it applies.
-- Proposals carry customer-impact checks and go through the same approvals as any action.
-- Realised savings are reported only after Resolution verifies the change.
-
-## Self-review before handover
-
-- *Accuracy.* Totals reconcile to usage data, each variance has an evidenced driver or is marked unexplained, and estimates show their method.
-- *Risk.* No proposal touches emergency coverage, monitoring or audit logging, and each has auto-wake or rollback.
-- *Handover.* Resolution receives proposals it can submit for approval without rework.
+- An item is over budget with no identified driver: Service Delivery Manager.
+- Spend is rising because of an unresolved incident (temporary capacity not reverted): Service Delivery Manager.
+- A saving would touch cells whose emergency coverage is unconfirmed: NOC Shift Lead, blocking for that proposal.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Period report | `ops/finops/<period>-report.md` | Cost by tower vs budget, variances and drivers, forecasts |
-| Capacity forecast | `ops/finops/<period>-capacity.md` | Licences, credits, PRB utilisation, limit dates |
-| Savings proposals | `ops/finops/proposals/<date>-<topic>.md` | Estimate, class, checks, rollback, verify step, routing |
+| Cost and capacity report | `ops/finops/cost-report.md` | Variance table, drivers, capacity findings, proposals with approval ids, recommendations |
+
+```
+# Cost and capacity report, <period>
+| Item | Month to date EUR | Budget EUR | Used % | Variance EUR | Flag | Driver (evidence) |
+### Capacity findings
+| Item | Signal | Reading | Meaning |
+### Proposals
+| Proposal | Class | Approvers | Estimated saving (label) | Customer check | Approval id |
+### Recommendations for the Service Delivery Manager
+```
 
 ## Definition of done
 
-1. Every tower has actual vs budget for the period.
-2. Each variance above tolerance has a driver or is marked unexplained.
-3. Each saving is a proposal with customer checks, routed to the Resolution Agent.
-4. Capacity limits within the next review have a warning.
+- [ ] Every percentage and variance can be recomputed from the figures shown beside it.
+- [ ] Each flagged item has a driver with evidence or reads "driver not identified".
+- [ ] Each proposal has class, approvers, rollback, a customer-KPI verify step and an approval id.
+- [ ] No saving is described as realised, and nothing in the report implies a change was made.
 
 ## Worked example
 
-October: RAN energy 7% over budget. Driver: night energy per TB in Business-Park-W rose
-after a carrier was added; PRB use at night under 10% on 38 cells for 14 of the last 21
-nights. None of the 38 is an emergency-coverage cell; neighbour night load peaks at 22%.
+- `get_cost_usage()` -> Snowflake warehouse DBT_XS 4,120 of 5,000 EUR (82%); Mediation cluster 2,890 of 3,000
+  (96%, flagged); RAN energy (night, idle cells) 51,200 of 48,000 (+3,200, +6.7%, over), note "412
+  sleep-candidate cells in `gld_cell_energy_daily`".
+- `get_pipeline_runs(scenario="dataops")` -> mediation host CPU 97%, feed lag 118 min: capacity finding,
+  not a saving target.
+- `propose_action(title="Pilot night sleep mode on about 40 sleep-candidate cells for 7 nights",
+  action_class="A3", steps="Cell list confirmed by the NOC Shift Lead, excluding emergency-coverage cells
+  and cells with enterprise services; sleep 01:00 to 05:00", blast_radius="About 40 low-traffic cells at
+  night; neighbours carry the traffic", rollback="Wake the cells and restore the previous schedule",
+  verify="Neighbour DCR < 1.5% each night; idle_night_kwh lower on pilot cells after 7 nights",
+  change_record="to be raised by CAB", approvers=["NOC Shift Lead", "Change Manager (CAB)"])` ->
+  `APR-91ab03d7`, pending. Saving: not quantified, the pilot measures it.
 
-Proposal: cell sleep 01:00 to 05:00 on 38 cells in Business-Park-W as a pilot. Estimate
-about €41k a year (modelled). Class A3, NOC Shift Lead and Change Manager (CAB). Auto-wake
-above 15 users per cell. Verify: night DCR and accessibility unchanged over 7 nights.
+Rejected: propose sleep mode on all 412 candidate cells to close the 3,200 EUR gap this month.
+Why: the candidate flag comes from energy data, not coverage; an untested change on 412 cells risks an outage that costs more than the gap.
 
-Rejected: enable sleep on all 412 candidate cells at once for the full €610k.
-Why: a network-wide change without a pilot has a large blast radius and no verified customer-impact evidence.
+## Red flags
 
-## Common failure modes
-
-| Failure | Prevention |
+| If you are about to | Do this instead |
 |---|---|
-| Savings that hurt customers | Coverage and neighbour-load checks; auto-wake |
-| Modelled saving reported as realised | Realised only after verified execution |
-| Cutting observability to save money | Monitoring and audit logging excluded |
-| Unexplained spend guessed | Mark unexplained and ask |
+| Call the mediation cluster "within budget" at 96% with CPU at 97% | Report it as a capacity finding |
+| Multiply 412 cells by an assumed kWh saving | Write "not quantified" and propose the pilot that measures it |
+| Verify a network saving on kWh alone | Add a customer KPI on the neighbouring cells |
+| Write "saved" for a proposal that is pending | Write "proposed", with the approval id |

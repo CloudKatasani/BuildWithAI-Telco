@@ -38,6 +38,7 @@ To produce a single self-contained file: `node demo/build.mjs` (writes `demo/dis
 |---|---|
 | `AGENTS/` | Agent definitions, skills, `telcocrew` runtime and tests |
 | `demo/` | The demo app (`index.html`, `styles.css`, `data.js`, `app.js`, generated `agents-manifest.js`) |
+| `docs/SKILL_TUNING_REVIEW.md` | Review findings, research sources, authoring contract v2, evals and next steps |
 | `docs/AgentWorkflow_Build_Operate_Consume.md` | Agent catalog, gates, action classes, human roles, team enablement |
 | `research/Telco_AI_Market_Research.md` | Market research with sources |
 | `UTIL_BuildWithAI_Spec.md` | Original BuildWithAI spec (utilities edition) this demo extends |

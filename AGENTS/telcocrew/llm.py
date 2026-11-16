@@ -21,6 +21,7 @@ class Turn:
     input_tokens: int = 0
     output_tokens: int = 0
     model: str = ""
+    cached_tokens: int = 0
 
 
 def live_available() -> bool:
@@ -44,8 +45,10 @@ class ClaudeProvider:
     def turn(self, *, system: str, messages: list, tools: list[dict], model: str, effort: str, max_tokens: int = 16000) -> Turn:
         a = self._anthropic
         tool_defs = [{**t, "eager_input_streaming": True} for t in tools]
+        # The system prompt (definition + three skills) and tool list are identical on every turn of a run, so cache
+        # them: later turns read the prefix at a fraction of the price and start faster.
         kw: dict = {"model": model, "max_tokens": max_tokens, "system": system, "messages": messages, "tools": tool_defs,
-                    "output_config": {"effort": effort}}
+                    "output_config": {"effort": effort}, "cache_control": {"type": "ephemeral"}}
         if model in FALLBACK_MODELS:
             kw["betas"] = ["server-side-fallback-2026-07-01"]
             kw["fallbacks"] = "default"
@@ -68,7 +71,10 @@ class ClaudeProvider:
         text = "".join(b.text for b in msg.content if b.type == "text")
         calls = [{"id": b.id, "name": b.name, "input": b.input if isinstance(b.input, dict) else {}}
                  for b in msg.content if b.type == "tool_use"]
-        return Turn(msg.content, text, calls, msg.stop_reason, msg.usage.input_tokens, msg.usage.output_tokens, msg.model)
+        u = msg.usage
+        cached = (getattr(u, "cache_read_input_tokens", 0) or 0)
+        total_in = u.input_tokens + cached + (getattr(u, "cache_creation_input_tokens", 0) or 0)
+        return Turn(msg.content, text, calls, msg.stop_reason, total_in, u.output_tokens, msg.model, cached)
 
 
 def validate_input(schema: dict, args: dict) -> list[str]:

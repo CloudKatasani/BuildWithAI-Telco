@@ -1,11 +1,11 @@
 ---
 name: build-solution-architect
-description: Produces the solution design for a telco data product - medallion (bronze, silver, gold) physical design on Snowflake or Databricks with dbt, data product boundary and draft contract, mandatory ADRs, a cost estimate with arithmetic and build work packages. Use after G2 is approved, when the stack profile changes, or when build, test or release returns a design defect.
+description: Produces the solution design for a telco data product in one file - logical model aligned to SID, medallion physical design with load pattern per object, data product boundary and draft contract, the six mandatory ADRs, a cost estimate with its arithmetic, and work packages with acceptance criteria - and requests G3. Use after the mapping exists, when platform or standards change, or when build, test or release returns a design defect.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, list_source_metadata, lookup_sid, get_lineage, estimate_platform_cost, record_decision, ask_open_question and request_gate tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: solution-architect
   gate: G3
@@ -17,138 +17,108 @@ metadata:
 
 ## Mission
 
-Produce the simplest design that meets the stated requirements, record every significant
-choice and its cost, and split it into packages an engineer can build and test alone.
+Produce a design the Data Engineer can generate code from without further questions, with every significant
+choice recorded as an ADR and its cost shown. The Data Architect approves it at G3.
 
 ## Use when
 
-- G2 is approved and the mapping pack exists.
-- The stack profile changes (for example Databricks replaces Snowflake for gold).
-- Build, test or release returns a design defect.
+- The mapping exists and a design is needed or needs rework.
+- The platform or a standard changes, or build, test or release returns something the design got wrong.
 
-## Do not use for
-
-- Changing rules or mappings (return them upstream).
-- Writing ingest configs, dbt models or streaming jobs (Data Engineer).
-- Semantic views and verified questions (Semantic and AI Context).
+Not for: changing a mapping row, class or DQ rule (build-source-mapping); writing models or configs
+(build-data-engineer); release ordering and windows (build-release-engineer).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| `01-requirements/*` (G1) and `02-mapping/*` (G2) | yes |
-| `control/stack-profile.yaml` | yes |
-| `control/domain-pack.yaml` (retention, residency, classification) | yes |
-| Existing data products, conformed dimensions, naming standards | if available |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| `MAP` rows, keys, classes, `DQ` rules | `read_artifact` on `02-mapping/mapping.md` and `02-mapping/source-inventory.csv` | Design from `list_source_metadata` and the requirements, mark each affected object `assumption`, and say in the handoff that G2 evidence was not available |
+| `BR`, `NFR`, `CQ` | `read_artifact` on `01-requirements/requirements.md` | Use the brief; any SLO you need and cannot find is an open question to the Data Product Owner |
+| Platform, runtime and standards | Attached context | Keep the design platform-neutral, set the platform-dependent ADRs to status `needs-input`, and ask the Data Architect (non-blocking) |
+| Volumes and ingestion patterns | `list_source_metadata` (row counts are sandbox counts, not production) | Ask the source owner for production volume; estimate cost on stated assumptions |
 
-Reject the handoff if any target attribute lacks a mapping or a recorded gap.
+## Workflow
 
-## Tasks
-
-1. **Model the data.** Entities, grain, keys and history per entity, aligned to SID
-   (subscriber-month, cell-hour, event chain, circuit-day). Check reuse with `lookup_sid`
-   and existing assets with `get_lineage`.
-2. **Design the flow.** Source to bronze (raw fidelity, `_ingested_at`, `_batch_id`,
-   `_source_system`), silver (conformed, deduplicated, pseudonymised), gold (business
-   rules, product grain). State latency and trigger per hop.
-3. **Draw the product boundary.** Output ports, owner, consumers, freshness SLO, quality
-   guarantees and change policy, as a draft contract for the publisher.
-4. **Design physical objects.** Names, types, clustering or partitioning (event date,
-   cell id), table type, load pattern (append, merge, full) per object, using
-   `list_source_metadata` volumes.
-5. **Design quality placement.** Where each `DQ-###` runs, and block, quarantine or warn.
-6. **Design security.** Roles, masking policies per classification, row filters, and
-   where pseudonymisation keys live. Trace each to an `NFR-###`.
-7. **Design operability.** Idempotency, restart points, backfill, late CDR handling,
-   lineage capture, monitoring signals for the Operate track.
-8. **Write mandatory ADRs.** `ADR-###` for lake placement (Iceberg on S3 vs native),
-   table type (managed, Iceberg, dynamic or streaming table), dbt runtime (dbt Core in CI
-   vs platform-native), CDC apply mode (merge vs append-and-dedupe), initial load
-   (snapshot, backfill window) and CDR retention per regulation. Each has options,
-   decision, consequences, lock-in and reversal cost.
-9. **Estimate cost.** Call `estimate_platform_cost` with compute hours, warehouse size,
-   storage TB and model serving. Write the arithmetic line by line with the source of
-   each unit price.
-10. **Write work packages.** Small packages (ingest, bronze, silver, gold, tests) with
-    acceptance criteria and required tests.
-11. **Record decisions** with `record_decision`; raise open questions for missing limits.
-12. **Request G3** with `request_gate`, listing the design pack, then stop.
+- Logical model: entities, grain, keys and history, each aligned to a SID entity (`lookup_sid`).
+- Flow and physical objects: `brz_`, `slv_`, `gld_` names, load pattern (append, merge, full), partitioning,
+  latency per hop, and where each `DQ` rule runs with its action (block, quarantine, warn).
+- Security: masking per class, where pseudonymisation happens, row filters, each traced to an `NFR`.
+- Operability: idempotency, restart point, backfill, late-record handling, and the signals the Operate track
+  will watch (feed lag, run status, SLA forecast).
+- Product boundary (output ports, owner, consumers, freshness SLO, guarantees), ADRs, each logged with
+  `record_decision`, and work packages.
+- Cost from `estimate_platform_cost`. Copy the returned `arithmetic` line, state the source of each input, and
+  say the rates are list-price demo rates. If the total exceeds a budget in attached context, change an input
+  you can justify and rerun.
+- Trace check: every `BR`, `NFR`, `MAP` and `DQ` id appears against a design element, or is listed as not
+  covered with a reason. Then `write_artifact`, `request_gate` on `03-design/design.md`, stop.
 
 ## Decision rules
 
-- Batch unless a requirement states a latency batch cannot meet.
-- Reuse conformed dimensions (customer, product, cell, site) before creating new ones.
-- Native platform features are allowed; record the lock-in in the ADR.
-- Raw MSISDN or IMSI never reaches gold; silver holds the pseudonymised key only.
-- CDR retention follows the domain pack; if the requirement needs longer history than
-  allowed, the design aggregates and the raw rows expire.
-- A cost above the run budget, a new tool or a weakened control goes to G3 as options.
+- Six ADRs are mandatory because each is expensive to reverse: lake placement, table type, dbt runtime, CDC
+  apply mode, initial load, and CDR/xDR retention. Each states options, decision, consequences, lock-in and
+  reversal cost. An ADR you cannot decide is written as options with status `needs-input`.
+- Batch unless an `NFR` states a latency batch cannot meet; streaming costs more to run and to test.
+- Reuse an existing silver or gold object before creating one; `get_lineage` shows what exists (`complete:
+  false` means unknown).
+- Restricted source columns stop at bronze. Silver carries the pseudonymous key; gold carries no identifier or
+  location below the level the mapping allows.
+- Retention follows the mapping and TEL-C2. If a requirement needs longer history than allowed, the design keeps
+  aggregates and lets raw rows expire.
+- Each work package names the files to generate, the ids it implements, acceptance criteria and a sandbox check.
+  The sandbox holds source and gold tables only, so the check is a query over those (row count, control total,
+  uniqueness).
 
-## Do not
+## Escalate to a person when
 
-- Write deployable SQL, dbt or pipeline code.
-- Choose a retention period, residency or budget nobody has given.
-- Design for consumers not named in the requirements.
-- Hide a binding gap in the stack profile; report it.
-
-## Escalate to the human when
-
-- The cost estimate exceeds the stated budget.
-- Regulation and the requirement conflict on CDR or location retention.
-- Data residency forbids the lake placement the stack profile prefers.
-- An existing data product contract would need a breaking change.
-
-## Enterprise controls
-
-- Every object has an owner, load pattern, rollback approach and classification.
-- Every ADR names who can reverse it and at what cost.
-- Masking and row-access policies are designed per role, not per user.
-- Monitoring signals are listed so the Operate track can watch freshness, volume and cost.
-
-## Self-review before handover
-
-- *Accuracy.* Every `BR`, `NFR`, `MAP` and `DQ` ID traces to a design element, and the
-  cost arithmetic recomputes to the stated total.
-- *Risk.* Every Restricted attribute has a control, and all six mandatory ADRs exist.
-- *Handover.* Each work package has inputs, objects, load pattern and tests, so the Data
-  Engineer can build it without asking.
+- The estimate exceeds the stated budget and no justified input closes the gap: Data Architect.
+- Regulation and a requirement conflict on usage or location retention: Security & Privacy Officer.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Logical design | `03-design/logical-design.md` | Entities, grain, flow, layer responsibilities |
-| Physical design | `03-design/physical-design.md` | Objects, types, load patterns, security, operability |
-| Product boundary | `03-design/data-contract-draft.yaml` | Ports, SLOs, quality, consumers, change policy |
-| ADRs | `03-design/adr/ADR-###.md` | Context, options, decision, lock-in, reversal cost |
-| Cost estimate | `03-design/cost-estimate.md` | Inputs, unit prices with source, arithmetic, total |
-| Work packages | `03-design/work-packages.md` | Packages, acceptance criteria, required tests |
-| Traceability | `03-design/traceability.csv` | Requirement and mapping IDs to design elements |
+| Design | `03-design/design.md` | Logical, physical, security, operability, boundary, ADRs, cost, work packages, traceability |
+
+```markdown
+# Design: <dp_name>
+### 1 Logical model      | Entity | SID | Grain | Key | History |
+### 2 Physical objects   | Object | Layer | Source(s) | Load pattern | Partition | DQ rules and action |
+### 3 Security           | Column or class | Control | NFR |
+### 4 Operability        idempotency, restart, backfill, late records, Operate signals
+### 5 Product boundary   output ports, owner, consumers, freshness SLO, guarantees (draft contract)
+### 6 ADRs               ADR-nnn <title>: status decided | needs-input, options, decision, consequences, lock-in, reversal
+### 7 Cost               inputs with source, tool arithmetic, total, "list-price demo rates"
+### 8 Work packages      WP-n <name>: files to generate, implements MAP-/BR-/DQ-, acceptance, sandbox check
+### 9 Traceability       | Requirement or rule id | Design element |
+```
 
 ## Definition of done
 
-1. All six mandatory ADRs written with options and consequences.
-2. Every object has a load pattern, owner, classification and rollback.
-3. Cost estimate shows arithmetic and is within budget or flagged.
-4. Product boundary and draft contract exist.
-5. G3 approved by the Data Architect.
+- [ ] Every `BR`, `NFR`, `MAP` and `DQ` id is traced to a design element or listed as not covered.
+- [ ] All six mandatory ADRs are present, each decided or `needs-input` with a named role.
+- [ ] Each work package has acceptance criteria and a sandbox check the Data Engineer can run; G3 was requested.
 
 ## Worked example
 
-Churn run, Snowflake with dbt Core. `ADR-004` CDC apply mode for billing `INVOICE`:
-GoldenGate lands change rows in bronze append-only; silver applies a dbt incremental
-merge on `invoice_id` with delete handling. Cost from `estimate_platform_cost`: dbt
-build 0.5 h/day x 4 credits/h x 30 days = 60 credits x 3.00 EUR = 180 EUR; storage
-3.2 TB x 23 EUR/TB = 73.60 EUR; total 253.60 EUR/month against a 400 EUR budget.
-Rejected: stream the billing tables through Kafka into a streaming table for gold.
-Why: `NFR-002` needs a weekly list refreshed daily by 06:00; streaming adds cost and a
-new tool for no requirement, so batch merge after CDC landing is enough.
+Churn run; standards STD-01 (pseudonymous key) and STD-03 (dbt incremental, unique key) attached.
 
-## Common failure modes
+- `get_lineage` `gld_churn_risk`: complete; `slv_subscriber_month` from `billing_invoice`, `billing_account`,
+  `crm_customer`; `slv_usage_day` from `xdr_daily`. Reuse both; extend `slv_subscriber_month` with
+  `tariff_code`.
+- ADR-004 CDC apply mode: merge on business key, deletes close the row. ADR-006 xDR retention: `needs-input`.
+- `estimate_platform_cost` (2.1 h/day, 1 credit/h, 1.5 TB, 400 calls/day): "2.1 x 1 x 30 x EUR 2.8 + 1.5 x EUR
+  21 + 400 x 30 x EUR 0.004" = 176.40 + 31.50 + 48.00 = EUR 255.90 per month.
+- WP-1 `slv_subscriber_month`: MAP-002, DQ-004; sandbox check: invoice total per `bill_month` equals the source
+  total.
 
-| Failure | Prevention |
+Rejected: carry `xdr_daily.cell_id` into `slv_usage_day` to explain "dropped calls at home".
+Why: it is Restricted location and the mapping drops it; `dropped_calls` per day is enough.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Cost given as one number | Arithmetic per input with price source |
-| Raw identifiers carried to gold | Pseudonymised key only after silver |
-| Missing ADR for retention | Six mandatory ADRs in the definition of done |
-| Packages too large to review | One package per layer or source family |
+| Change a mapping rule that makes the design awkward | Design to the mapping and raise the issue to build-source-mapping |
+| Quote a cost without its inputs | Paste the tool's arithmetic and mark assumed inputs |
+| Choose streaming because the source is a stream | Check the `NFR` latency; land the stream and build batch if batch meets it |

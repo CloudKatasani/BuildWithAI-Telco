@@ -106,11 +106,11 @@ def _live_loop(ctx: Ctx, task: str, context: str, out: AgentResult, model: str, 
         intro += f"\n\nAttached context:\n{untrusted('context', context)}"
     messages: list = [{"role": "user", "content": intro}]
     system = system_prompt(agent.id)
-    tin = tout = 0
+    tin = tout = cached = 0
     for n in range(1, MAX_TURNS + 1):
         session.emit("think", agent.id, f"Calling {model} (effort {effort}), turn {n}")
         turn = provider.turn(system=system, messages=messages, tools=defs, model=model, effort=effort)
-        tin, tout = tin + turn.input_tokens, tout + turn.output_tokens
+        tin, tout, cached = tin + turn.input_tokens, tout + turn.output_tokens, cached + getattr(turn, 'cached_tokens', 0)
         messages.append({"role": "assistant", "content": turn.history_content})
         if turn.text.strip():
             session.emit("think", agent.id, turn.text.strip()[:600])
@@ -134,7 +134,7 @@ def _live_loop(ctx: Ctx, task: str, context: str, out: AgentResult, model: str, 
         session.flush()
     else:
         out.status, out.final = "blocked", "Stopped after the maximum number of turns."
-    out.usage = {"input_tokens": tin, "output_tokens": tout, "model": model, "effort": effort}
+    out.usage = {"input_tokens": tin, "output_tokens": tout, "cached_input_tokens": cached, "model": model, "effort": effort}
 
 
 def known_tools() -> list[str]:
