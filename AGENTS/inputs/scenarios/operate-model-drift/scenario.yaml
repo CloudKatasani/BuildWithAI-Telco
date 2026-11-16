@@ -1,0 +1,13 @@
+title: Churn model drift after tariff launch (MLOps)
+track: operate
+kind: pipeline
+ops_scenario: mlops
+request_file: request.md
+context_files: []
+datasets:
+- operations/model_metrics.json
+- operations/changes.json
+- operations/kedb.json
+approvals: Retrain + shadow (ML Lead / Model Risk), message, KEDB
+live_duration_minutes: 5-8 live
+presenter_notes: 'Shadow first, promote later: shows A2 vs A3 for models.'

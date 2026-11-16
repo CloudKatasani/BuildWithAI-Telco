@@ -1,0 +1,15 @@
+title: Care copilot during the network incident
+track: consume
+kind: agent
+agent: consume-care-copilot
+tasks:
+- 'A Metro-North customer is calling for the third time this fortnight about dropped calls and asks to cancel. Prepare
+  the agent: summary, suggested reply, next step.'
+context_files:
+- context/care-scripts.md
+datasets:
+- gld_churn_risk
+- care_ticket
+approvals: Goodwill credit (Customer Care Lead + Security & Privacy Officer)
+live_duration_minutes: 3 live
+presenter_notes: Masked data only; any credit goes for approval.

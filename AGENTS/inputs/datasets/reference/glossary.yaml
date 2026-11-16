@@ -1,0 +1,28 @@
+churn:
+  term: Churn
+  definition: A post-paid line disconnected or ported out within 30 days of the score date (BR-01).
+  steward: Data Steward
+arpu:
+  term: ARPU
+  definition: Revenue / average active lines in the month.
+  steward: Data Steward
+at-risk arpu:
+  term: At-risk ARPU
+  definition: Monthly ARPU of lines with churn score >= 0.7.
+  steward: Data Steward
+leakage:
+  term: Revenue leakage
+  definition: Value of chargeable events with no invoice line in their bill cycle.
+  steward: Data Steward
+availability:
+  term: Availability
+  definition: Up minutes / scheduled minutes excluding approved maintenance.
+  steward: Data Steward
+sleep candidate:
+  term: Sleep candidate cell
+  definition: PRB < 10% for 4+ consecutive night hours on 14 of 21 nights, not emergency coverage.
+  steward: Data Steward
+dcr:
+  term: Dropped call rate
+  definition: Abnormal releases / established calls.
+  steward: Data Steward

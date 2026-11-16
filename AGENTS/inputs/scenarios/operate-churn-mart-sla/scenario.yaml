@@ -1,0 +1,14 @@
+title: Churn mart SLA breach (DataOps)
+track: operate
+kind: pipeline
+ops_scenario: dataops
+request_file: request.md
+context_files:
+- context/noc-operating-notes.md
+datasets:
+- operations/pipeline_runs.json
+- operations/changes.json
+- operations/kedb.json
+approvals: Hotfix PR (Engineering Lead + CAB), scale-out (SDM), message (SDM), KEDB (Problem Manager)
+live_duration_minutes: 6-10 live
+presenter_notes: 'Two causes, one incident: the agents separate the schema rename (RN-772) from mediation CPU saturation.'

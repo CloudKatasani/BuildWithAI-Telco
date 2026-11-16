@@ -1,0 +1,23 @@
+[
+ {
+  "id": "KE-2207",
+  "title": "Handover offset change > 2 dB causes ping-pong in dense urban clusters",
+  "symptoms": "DCR and handover failures rise only on changed cells within 15 min of a push",
+  "checks": "Compare changed vs unchanged neighbour cells; read handover failure counters",
+  "fix": "Roll back offset from stored config"
+ },
+ {
+  "id": "KE-1189",
+  "title": "Upstream schema rename without contract notice breaks staging model",
+  "symptoms": "dbt staging failure: column not found after a source release",
+  "checks": "Diff source columns vs data contract",
+  "fix": "Map renamed column in staging model; rerun"
+ },
+ {
+  "id": "KE-3011",
+  "title": "Tariff launch shifts usage features and degrades churn precision",
+  "symptoms": "PSI > 0.2 on usage features in migrated lines",
+  "checks": "Split precision by migrated vs not",
+  "fix": "Retrain with tariff_family feature; shadow then promote"
+ }
+]

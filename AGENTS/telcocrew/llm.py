@@ -85,3 +85,29 @@ def validate_input(schema: dict, args: dict) -> list[str]:
         elif spec.get("type") == "string" and not isinstance(v, str):
             problems.append(f"`{k}` must be a string")
     return problems
+
+
+def preflight(model: str = "claude-opus-5-5") -> list[tuple[str, bool, str]]:
+    """Checks to run before a live demo. Costs no tokens (model lookup only)."""
+    checks: list[tuple[str, bool, str]] = []
+    try:
+        import anthropic
+        checks.append(("Anthropic SDK installed", True, anthropic.__version__))
+    except ImportError:
+        return [("Anthropic SDK installed", False, "pip install -r requirements.txt")]
+    has_key = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    checks.append(("Credentials in environment", has_key, "ANTHROPIC_API_KEY set" if has_key else "export ANTHROPIC_API_KEY=..."))
+    if not has_key:
+        return checks
+    try:
+        info = anthropic.Anthropic(max_retries=1).models.retrieve(model)
+        checks.append((f"Model {model} available to this key", True, getattr(info, "display_name", model)))
+    except anthropic.AuthenticationError:
+        checks.append((f"Model {model} available to this key", False, "key rejected (401)"))
+    except anthropic.NotFoundError:
+        checks.append((f"Model {model} available to this key", False, "model not found for this key"))
+    except anthropic.APIConnectionError:
+        checks.append((f"Model {model} available to this key", False, "cannot reach api.anthropic.com"))
+    except anthropic.APIStatusError as e:
+        checks.append((f"Model {model} available to this key", False, f"API error {e.status_code}"))
+    return checks

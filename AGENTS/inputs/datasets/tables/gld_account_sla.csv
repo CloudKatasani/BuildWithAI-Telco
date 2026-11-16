@@ -1,0 +1,9 @@
+account,availability_mtd,sla_target,credit_exposure_eur,breach_forecast
+Northwind Logistics,99.71,99.9,18400,1
+Contoso Health,99.82,99.95,12000,1
+Fabrikam Retail,99.86,99.9,6100,1
+Adatum Freight,99.88,99.9,7300,1
+Litware Labs,99.84,99.9,5200,1
+Proseware Media,99.79,99.9,4900,1
+Tailspin Air Cargo,99.89,99.95,4300,1
+Woodgrove Bank,99.99,99.95,0,0

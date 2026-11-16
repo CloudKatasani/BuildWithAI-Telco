@@ -1,0 +1,15 @@
+title: Weekly steering brief (Exec Briefing)
+track: consume
+kind: agent
+agent: consume-exec-briefing
+tasks:
+- 'Write this week''s steering brief for the executive team: churn and revenue at risk, revenue leakage, enterprise
+  SLA exposure, and the decisions needed.'
+context_files: []
+datasets:
+- gld_churn_risk
+- gld_recon_daily
+- gld_account_sla
+approvals: none
+live_duration_minutes: 3 live
+presenter_notes: Certified metrics only; estimates labelled.

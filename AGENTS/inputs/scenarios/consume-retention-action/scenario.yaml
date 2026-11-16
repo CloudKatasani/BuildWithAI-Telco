@@ -1,0 +1,15 @@
+title: Retention action for Metro-North (Next-Best-Action)
+track: consume
+kind: agent
+agent: consume-next-best-action
+tasks:
+- Churn risk jumped in Metro-North after the network incident. Propose a retention action for high-value, consented
+  lines, with expected value and checks.
+context_files:
+- context/team-standards.md
+- context/offer-policy.md
+datasets:
+- gld_churn_risk
+approvals: Retention offer (Campaign Manager + Security & Privacy Officer)
+live_duration_minutes: 3-5 live
+presenter_notes: 'Nothing is sent: the agent only proposes. Approve it in the Approvals panel.'

@@ -15,7 +15,11 @@ from . import data
 from .guardrails import (PEOPLE, ApprovalStore, AuditLog, GuardrailBlocked, redact, scan_injection, sha)
 from .registry import ROOT, Agent
 
-RUNS_DIR = ROOT / ".runs"
+
+
+def artifacts_dir() -> Path:
+    import os
+    return Path(os.environ.get("TELCOCREW_ARTIFACTS_DIR") or ROOT / "artifacts")
 
 
 # ---------------------------------------------------------------- session (one workspace, shared by a workflow)
@@ -29,11 +33,39 @@ class Session:
     audit: AuditLog = field(default_factory=AuditLog)
     approvals: ApprovalStore | None = None
     persist: bool = False
+    ops_scenario: str | None = None          # noc | dataops | mlops: default filter for operate tools
+    meta: dict = field(default_factory=dict)  # scenario, mode, model, usage ... written to run.json
+    transcript: list[dict] = field(default_factory=list)
 
     def __post_init__(self):
         if self.approvals is None:
             self.approvals = ApprovalStore(self.audit)
         self._lock = threading.Lock()
+
+    @property
+    def out_dir(self) -> Path:
+        return artifacts_dir() / self.id
+
+    def flush(self) -> None:
+        """Write the run record to artifacts/<run-id>/: events, audit, approvals, transcript, run.json."""
+        if not self.persist:
+            return
+        d = self.out_dir
+        d.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            events, entries = list(self.events), list(self.audit.entries)
+        (d / "events.jsonl").write_text("".join(json.dumps(e, default=str) + "\n" for e in events))
+        (d / "audit.jsonl").write_text("".join(json.dumps(e, default=str) + "\n" for e in entries))
+        (d / "approvals.json").write_text(json.dumps([a.as_dict() for a in self.approvals.items.values()], indent=1, default=str))
+        (d / "decisions-and-questions.json").write_text(json.dumps({"decisions": self.decisions, "open_questions": self.questions}, indent=1))
+        (d / "transcript.md").write_text(render_transcript(self))
+        usage = {"input_tokens": sum(t.get("usage", {}).get("input_tokens", 0) for t in self.transcript),
+                 "output_tokens": sum(t.get("usage", {}).get("output_tokens", 0) for t in self.transcript)}
+        usage["est_cost_usd"] = round(usage["input_tokens"] / 1e6 * 4 + usage["output_tokens"] / 1e6 * 20, 4)
+        (d / "run.json").write_text(json.dumps({"run_id": self.id, **self.meta, "usage": usage,
+                                                "usage_note": "Estimate at claude-opus-5-5 list price ($4 / $20 per MTok).",
+                                                "artifacts": sorted(self.artifacts), "audit_valid": self.audit.verify(),
+                                                "audit_entries": len(entries)}, indent=1, default=str))
 
     def emit(self, kind: str, who: str, text: str, **extra) -> dict:
         e = {"seq": len(self.events) + 1, "ts": time.strftime("%H:%M:%S"), "kind": kind, "who": who, "text": text, **extra}
@@ -44,7 +76,7 @@ class Session:
     def write(self, path: str, content: str) -> None:
         self.artifacts[path] = content
         if self.persist:
-            p = RUNS_DIR / self.id / path
+            p = self.out_dir / "workspace" / path
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content)
 
@@ -291,14 +323,14 @@ def publish_data_product(ctx: Ctx, a: dict):
 
 
 # ---------------------------------------------------------------- operate
-def _scn(items, a):
-    s = a.get("scenario")
+def _scn(items, a, ctx=None):
+    s = a.get("scenario") or (ctx.session.ops_scenario if ctx else None)
     return [i for i in items if not s or i.get("scenario") in (s, None)]
 
 
 @tool("get_alarms", "A0", ("operate",), "Active and recent alarms (TMF642 shape). Filter by scenario: noc, dataops, mlops.", {"scenario": S, "element": S})
 def get_alarms(ctx: Ctx, a: dict):
-    al = _scn(data.ALARMS, a)
+    al = _scn(data.ALARMS, a, ctx)
     if a.get("element"):
         al = [x for x in al if a["element"].lower() in x["element"].lower()]
     return {"alarms": al, "raw_count": sum(x.get("count", 1) for x in al)}
@@ -326,7 +358,7 @@ def get_topology(ctx: Ctx, a: dict):
 
 @tool("get_recent_changes", "A0", ("operate",), "Change records and config pushes. Filter by scenario.", {"scenario": S})
 def get_recent_changes(ctx: Ctx, a: dict):
-    return {"changes": _scn(data.CHANGES, a)}
+    return {"changes": _scn(data.CHANGES, a, ctx)}
 
 
 @tool("search_kedb", "A0", ("operate",), "Search the known-error database.", {"query": S}, ["query"])
@@ -338,7 +370,7 @@ def search_kedb(ctx: Ctx, a: dict):
 
 @tool("get_pipeline_runs", "A0", ("operate",), "Pipeline, feed and dbt run status, lag and SLA forecast.", {"scenario": S})
 def get_pipeline_runs(ctx: Ctx, a: dict):
-    return {"runs": _scn(data.PIPELINE_RUNS, a)}
+    return {"runs": _scn(data.PIPELINE_RUNS, a, ctx)}
 
 
 @tool("get_model_metrics", "A0", ("operate",), "Model drift (PSI) and precision by segment.", {"model": S})
@@ -489,5 +521,17 @@ def approver_people() -> dict:
     return PEOPLE
 
 
-def _unused(*_: Any) -> Path:  # keep Path import for type hints in callers
-    return RUNS_DIR
+def render_transcript(s: "Session") -> str:
+    lines = [f"# Run {s.id}", "", f"Scenario: {s.meta.get('scenario', '-')}  ", f"Mode: {s.meta.get('mode', '-')}  ",
+             f"Model: {s.meta.get('model', '-')}", "", "All data is synthetic (NorthStar Telecom). AI-generated content, reviewed by the named approvers.", ""]
+    for t in s.transcript:
+        lines += [f"## {t['agent']} ({t.get('mode')})", "", "**Task**", "", t.get("task", ""), ""]
+        if t.get("tool_calls"):
+            lines += ["**Tool calls**", "", "| # | Tool | Arguments | Result |", "|---|---|---|---|"]
+            for i, c in enumerate(t["tool_calls"], 1):
+                args = json.dumps(c["args"], default=str).replace("|", "/")[:160]
+                res = ("ERROR " if c["error"] else "") + c["result_preview"].replace("|", "/").replace("\n", " ")[:200]
+                lines.append(f"| {i} | `{c['tool']}` | {args} | {res} |")
+            lines.append("")
+        lines += ["**Final answer / handoff**", "", t.get("final", ""), "", f"Status: {t.get('status')}  Usage: {t.get('usage', {})}", ""]
+    return "\n".join(lines)

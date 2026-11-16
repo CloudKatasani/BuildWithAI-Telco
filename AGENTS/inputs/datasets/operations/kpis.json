@@ -1,0 +1,20 @@
+{
+ "MN-07": {
+  "dcr_pct": {
+   "before_18:30": 0.9,
+   "18:45": 3.7
+  },
+  "handover_fail_x": 9.1,
+  "users": 41000
+ },
+ "MN-AGG-2": {
+  "packet_loss_pct": 0.2,
+  "flaps_2min": 6
+ },
+ "NEIGHBOUR MN-06 (same router)": {
+  "dcr_pct": {
+   "before_18:30": 0.8,
+   "18:45": 0.9
+  }
+ }
+}

@@ -31,6 +31,9 @@ class Pipeline:
     steps: list[str]
     mode: str | None = None
     session: Session = field(default_factory=Session)
+    context: str = ""
+    model: str | None = None
+    effort: str | None = None
     id: str = field(default_factory=lambda: f"PL-{uuid.uuid4().hex[:6]}")
     idx: int = 0
     status: str = "ready"          # ready | running | waiting | done | stopped
@@ -45,6 +48,8 @@ class Pipeline:
     # ---------------------------------------------------------------- one step
     def _task_for(self, agent_id: str, comment: str = "") -> str:
         n = self._seen.get(agent_id, 0)
+        if getattr(self, "task_list", None):
+            return self.task_list[min(self.idx, len(self.task_list) - 1)] + (f"\n\nReviewer requested changes: {comment}" if comment else "")
         extra = STEP_TASKS.get(agent_id, [])
         step_task = extra[min(n, len(extra) - 1)] if extra else ""
         task = f"{self.request}\n\n{step_task}".strip()
@@ -55,7 +60,7 @@ class Pipeline:
     def _run_step(self, comment: str = "") -> None:
         agent_id = self.steps[self.idx]
         before = set(self.session.approvals.items)
-        res = run_agent(agent_id, self._task_for(agent_id, comment), self.session, self.mode)
+        res = run_agent(agent_id, self._task_for(agent_id, comment), self.session, self.mode, self.context, self.model, self.effort)
         self._seen[agent_id] = self._seen.get(agent_id, 0) + 1
         new = [a for a in self.session.approvals.items if a not in before]
         if agent_id == "operate-problem-knowledge":
@@ -107,25 +112,48 @@ class Pipeline:
                 self._run_step()
             if self.status == "done":
                 self.session.emit("done", "runtime", f"{self.track} pipeline complete. Audit chain valid: {self.session.audit.verify()}")
+            self.session.meta.update(pipeline=self.track, pipeline_status=self.status, step=self.idx, steps=self.steps)
+            self.session.flush()
             return self.status
 
     def state(self) -> dict:
         s = self.session
-        return {"id": self.id, "track": self.track, "request": self.request, "status": self.status, "step": self.idx,
+        return {"id": self.id, "run_record": str(s.out_dir) if s.persist else None, "meta": s.meta, "track": self.track, "request": self.request, "status": self.status, "step": self.idx,
                 "steps": self.steps, "waiting_on": self.waiting_on, "results": self.results,
                 "approvals": [a.as_dict() for a in s.approvals.items.values()], "artifacts": sorted(s.artifacts),
                 "questions": s.questions, "events": s.events[-200:], "audit_valid": s.audit.verify(), "audit_entries": len(s.audit.entries)}
 
 
-def build_pipeline(request: str, mode: str | None = None, with_ml: bool | None = None) -> Pipeline:
+def build_pipeline(request: str, mode: str | None = None, with_ml: bool | None = None, **kw) -> Pipeline:
     steps = list(BUILD_STEPS)
     if with_ml is False or (with_ml is None and any(k in request.lower() for k in ("sla", "enterprise", "b2b"))):
         steps.remove("build-ml-engineer")
-    return Pipeline("build", request, steps, mode)
+    return Pipeline("build", request, steps, mode, **kw)
 
 
-def operate_pipeline(request: str, mode: str | None = None) -> Pipeline:
-    return Pipeline("operate", request, list(OPERATE_STEPS), mode)
+def operate_pipeline(request: str, mode: str | None = None, **kw) -> Pipeline:
+    return Pipeline("operate", request, list(OPERATE_STEPS), mode, **kw)
+
+
+def scenario_pipeline(sc: dict, mode: str | None = None, model: str | None = None, effort: str | None = None,
+                      persist: bool = True) -> Pipeline:
+    """A pipeline for a scenario pack (inputs/scenarios/<id>). Agent-kind scenarios run their tasks as steps."""
+    session = Session(persist=persist, ops_scenario=sc.get("ops_scenario"))
+    session.meta.update(scenario=sc["id"], title=sc.get("title"), track=sc["track"])
+    kw = dict(session=session, context=sc.get("context", ""), model=model, effort=effort)
+    if persist:   # keep the exact inputs next to the outputs
+        d = session.out_dir / "inputs"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "request.md").write_text(sc.get("request") or "\n\n".join(sc.get("tasks", [])))
+        if sc.get("context"):
+            (d / "context.md").write_text(sc["context"])
+    if sc.get("kind") == "agent":
+        p = Pipeline(sc["track"], sc["tasks"][0], [sc["agent"]] * len(sc["tasks"]), mode, **kw)
+        p.task_list = list(sc["tasks"])
+        return p
+    if sc["track"] == "build":
+        return build_pipeline(sc["request"], mode, sc.get("with_ml"), **kw)
+    return operate_pipeline(sc["request"], mode, **kw)
 
 
 def approve_all(p: Pipeline, decision: str = "approve", comment: str = "") -> None:

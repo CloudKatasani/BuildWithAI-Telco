@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import re
 import sqlite3
 import threading
 
@@ -216,66 +217,101 @@ _lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
 
 
-def _build() -> sqlite3.Connection:
-    rnd = random.Random(42)
-    c = sqlite3.connect(":memory:", check_same_thread=False)
-    c.execute("CREATE TABLE crm_customer(customer_id, msisdn, full_name, date_of_birth, region, segment, consent_marketing, created_date)")
-    c.execute("CREATE TABLE billing_account(account_id, customer_id, tariff_code, monthly_fee, status)")
-    c.execute("CREATE TABLE billing_invoice(invoice_id, account_id, bill_month, total_amount)")
-    c.execute("CREATE TABLE xdr_daily(subscriber_key, day, data_mb, voice_min, dropped_calls, cell_id)")
-    c.execute("CREATE TABLE care_ticket(ticket_id, customer_id, opened_at, category, status)")
-    c.execute("CREATE TABLE pm_cell_kpi(cell_id, hour_ts, prb_util, dcr, users, kwh)")
-    c.execute("CREATE TABLE inventory_cell(cell_id, site_id, cluster, router_id, emergency_coverage)")
-    c.execute("CREATE TABLE gld_churn_risk(subscriber_key, region, value_segment, arpu, risk_score, top_driver, churned_30d)")
-    c.execute("CREATE TABLE gld_cell_energy_daily(cell_id, cluster, idle_night_kwh, sleep_candidate)")
-    c.execute("CREATE TABLE gld_recon_daily(month, leak_point, leakage_eur)")
-    c.execute("CREATE TABLE gld_account_sla(account, availability_mtd, sla_target, credit_exposure_eur, breach_forecast)")
-    n = 6000
+TABLE_COLUMNS = {
+    "crm_customer": ["customer_id", "msisdn", "full_name", "date_of_birth", "region", "segment", "consent_marketing", "created_date"],
+    "billing_account": ["account_id", "customer_id", "tariff_code", "monthly_fee", "status"],
+    "billing_invoice": ["invoice_id", "account_id", "bill_month", "total_amount"],
+    "xdr_daily": ["subscriber_key", "day", "data_mb", "voice_min", "dropped_calls", "cell_id"],
+    "care_ticket": ["ticket_id", "customer_id", "opened_at", "category", "status"],
+    "pm_cell_kpi": ["cell_id", "hour_ts", "prb_util", "dcr", "users", "kwh"],
+    "inventory_cell": ["cell_id", "site_id", "cluster", "router_id", "emergency_coverage"],
+    "gld_churn_risk": ["subscriber_key", "region", "value_segment", "arpu", "risk_score", "top_driver", "churned_30d"],
+    "gld_cell_energy_daily": ["cell_id", "cluster", "idle_night_kwh", "sleep_candidate"],
+    "gld_recon_daily": ["month", "leak_point", "leakage_eur"],
+    "gld_account_sla": ["account", "availability_mtd", "sla_target", "credit_exposure_eur", "breach_forecast"],
+}
+
+
+def generate_tables(n: int = 6000, seed: int = 42) -> dict[str, list[tuple]]:
+    """Deterministic synthetic rows for every table. Used to (re)generate inputs/datasets."""
+    rnd = random.Random(seed)
+    t: dict[str, list[tuple]] = {k: [] for k in TABLE_COLUMNS}
     for i in range(n):
         cid = f"C{i:07d}"
         region = rnd.choice(REGIONS)
         seg = rnd.choices(SEGMENTS, [0.25, 0.45, 0.30])[0]
-        c.execute("INSERT INTO crm_customer VALUES (?,?,?,?,?,?,?,?)",
-                  (cid, f"+44 7700 9{rnd.randint(10000, 99999)}", f"Synthetic Person {i}", f"19{rnd.randint(50, 99)}-0{rnd.randint(1, 9)}-1{rnd.randint(0, 9)}",
-                   region, seg, rnd.choice("YYYN"), f"20{rnd.randint(12, 25)}-0{rnd.randint(1, 9)}-01"))
+        t["crm_customer"].append((cid, f"+999 0{rnd.randint(10, 99)} {rnd.randint(100, 999)} {rnd.randint(1000, 9999)}", f"Synthetic Person {i}",
+                                  f"19{rnd.randint(50, 99)}-0{rnd.randint(1, 9)}-1{rnd.randint(0, 9)}",
+                                  region, seg, rnd.choice("YYYN"), f"20{rnd.randint(12, 25)}-0{rnd.randint(1, 9)}-01"))
         tariff, fee = rnd.choice(TARIFFS)
-        c.execute("INSERT INTO billing_account VALUES (?,?,?,?,?)", (100000 + i, cid, tariff, fee, rnd.choice(["ACTIVE"] * 9 + ["SUSPENDED"])))
+        t["billing_account"].append((100000 + i, cid, tariff, fee, rnd.choice(["ACTIVE"] * 9 + ["SUSPENDED"])))
         for m in ("2026-09", "2026-10"):
-            c.execute("INSERT INTO billing_invoice VALUES (?,?,?,?)", (int(f"{100000 + i}{m[-2:]}"), 100000 + i, m, round(fee * rnd.uniform(0.95, 1.4), 2)))
+            t["billing_invoice"].append((int(f"{100000 + i}{m[-2:]}"), 100000 + i, m, round(fee * rnd.uniform(0.95, 1.4), 2)))
         key = "SK" + hashlib.sha256(cid.encode()).hexdigest()[:10].upper()
-        c.execute("INSERT INTO xdr_daily VALUES (?,?,?,?,?,?)", (key, "2026-11-15", round(rnd.uniform(50, 4000), 1), round(rnd.uniform(0, 120), 1),
-                                                               rnd.choice([0, 0, 0, 1, 2]), f"C{rnd.randint(1, 400):03d}"))
+        t["xdr_daily"].append((key, "2026-11-15", round(rnd.uniform(50, 4000), 1), round(rnd.uniform(0, 120), 1),
+                               rnd.choice([0, 0, 0, 1, 2]), f"C{rnd.randint(1, 400):03d}"))
         risk = round(min(0.99, max(0.01, rnd.betavariate(2, 5) + (0.15 if region in ("North-East", "Metro-North") else 0))), 3)
         arpu = {"High": rnd.uniform(45, 90), "Mid": rnd.uniform(25, 45), "Low": rnd.uniform(10, 25)}[seg]
-        c.execute("INSERT INTO gld_churn_risk VALUES (?,?,?,?,?,?,?)", (key, region, seg, round(arpu, 2), risk, rnd.choice(DRIVERS),
-                                                                        1 if rnd.random() < risk * 0.12 else 0))
+        t["gld_churn_risk"].append((key, region, seg, round(arpu, 2), risk, rnd.choice(DRIVERS), 1 if rnd.random() < risk * 0.12 else 0))
         if rnd.random() < 0.15:
-            c.execute("INSERT INTO care_ticket VALUES (?,?,?,?,?)", (f"TT{i:06d}", cid, "2026-11-15T18:4%d:00Z" % rnd.randint(0, 9),
-                                                                    rnd.choice(["Dropped calls", "No data", "Billing", "Cancellation"]), rnd.choice(["OPEN", "RESOLVED"])))
+            t["care_ticket"].append((f"TT{i:06d}", cid, "2026-11-15T18:4%d:00Z" % rnd.randint(0, 9),
+                                     rnd.choice(["Dropped calls", "No data", "Billing", "Cancellation"]), rnd.choice(["OPEN", "RESOLVED"])))
     for j in range(1, 401):
         cluster = CLUSTERS[j % len(CLUSTERS)]
         cell = f"C{j:03d}"
-        c.execute("INSERT INTO inventory_cell VALUES (?,?,?,?,?)", (cell, f"S{(j - 1) // 3 + 1:03d}", cluster, f"AGG-{j % 9}", "Y" if j % 37 == 0 else "N"))
+        t["inventory_cell"].append((cell, f"S{(j - 1) // 3 + 1:03d}", cluster, f"AGG-{j % 9}", "Y" if j % 37 == 0 else "N"))
         for h in (2, 3, 14, 18):
             prb = rnd.uniform(2, 12) if h in (2, 3) else rnd.uniform(30, 90)
-            c.execute("INSERT INTO pm_cell_kpi VALUES (?,?,?,?,?,?)", (cell, f"2026-11-15T{h:02d}:00Z", round(prb, 1), round(rnd.uniform(0.3, 1.4), 2),
-                                                                    int(prb * 3), round(rnd.uniform(2, 6), 2)))
+            t["pm_cell_kpi"].append((cell, f"2026-11-15T{h:02d}:00Z", round(prb, 1), round(rnd.uniform(0.3, 1.4), 2), int(prb * 3), round(rnd.uniform(2, 6), 2)))
         sleep = 1 if (j % 37 != 0 and rnd.random() < 0.55) else 0
-        c.execute("INSERT INTO gld_cell_energy_daily VALUES (?,?,?,?)", (cell, cluster, round(rnd.uniform(15, 40) * (1.4 if sleep else 0.6), 1), sleep))
+        t["gld_cell_energy_daily"].append((cell, cluster, round(rnd.uniform(15, 40) * (1.4 if sleep else 0.6), 1), sleep))
     for month, rows in {"2026-09": [("Rated, not billed (roaming data)", 151000), ("Mediated, not rated", 61000), ("Zero-rated in error", 24000)],
                         "2026-10": [("Rated, not billed (roaming data)", 112000), ("Mediated, not rated", 47000), ("Zero-rated in error", 25000)]}.items():
         for lp, v in rows:
-            c.execute("INSERT INTO gld_recon_daily VALUES (?,?,?)", (month, lp, v))
-    for acc, av, tgt, cr, br in [("Northwind Logistics", 99.71, 99.9, 18400, 1), ("Contoso Health", 99.82, 99.95, 12000, 1),
-                                 ("Fabrikam Retail", 99.86, 99.9, 6100, 1), ("Adatum Freight", 99.88, 99.9, 7300, 1),
-                                 ("Litware Labs", 99.84, 99.9, 5200, 1), ("Proseware Media", 99.79, 99.9, 4900, 1),
-                                 ("Tailspin Air Cargo", 99.89, 99.95, 4300, 1), ("Woodgrove Bank", 99.99, 99.95, 0, 0)]:
-        c.execute("INSERT INTO gld_account_sla VALUES (?,?,?,?,?)", (acc, av, tgt, cr, br))
+            t["gld_recon_daily"].append((month, lp, v))
+    t["gld_account_sla"] = [("Northwind Logistics", 99.71, 99.9, 18400, 1), ("Contoso Health", 99.82, 99.95, 12000, 1),
+                            ("Fabrikam Retail", 99.86, 99.9, 6100, 1), ("Adatum Freight", 99.88, 99.9, 7300, 1),
+                            ("Litware Labs", 99.84, 99.9, 5200, 1), ("Proseware Media", 99.79, 99.9, 4900, 1),
+                            ("Tailspin Air Cargo", 99.89, 99.95, 4300, 1), ("Woodgrove Bank", 99.99, 99.95, 0, 0)]
+    return t
+
+
+LOADED_FROM = "generated in memory"
+
+
+def _build() -> sqlite3.Connection:
+    """Load the synthetic estate from inputs/datasets when present (so presenters can edit it), otherwise
+    generate it in memory."""
+    global LOADED_FROM
+    from . import inputs
+    tables = inputs.load_datasets()
+    if tables is None:
+        tables = {k: (TABLE_COLUMNS[k], v) for k, v in generate_tables().items()}
+        LOADED_FROM = "generated in memory"
+    else:
+        LOADED_FROM = str(inputs.datasets_dir())
+    c = sqlite3.connect(":memory:", check_same_thread=False)
+    for name, (cols, rows) in tables.items():
+        if not re.fullmatch(r"[a-z_0-9]+", name) or not all(re.fullmatch(r"[a-z_0-9]+", x) for x in cols):
+            raise ValueError(f"Invalid table or column name in dataset {name}")
+        c.execute(f"CREATE TABLE {name}({', '.join(cols)})")
+        if rows:
+            c.executemany(f"INSERT INTO {name} VALUES ({','.join('?' * len(cols))})", rows)
     c.commit()
-    for sysname, s in SOURCES.items():
+    for s in SOURCES.values():
         for t, spec in s["tables"].items():
-            spec["rows"] = c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+            try:
+                spec["rows"] = c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+            except sqlite3.Error:
+                spec["rows"] = 0
     return c
+
+
+def reset() -> None:
+    """Drop the in-memory database so the next query reloads the inputs (after editing datasets)."""
+    global _conn
+    with _lock:
+        _conn = None
 
 
 def db() -> sqlite3.Connection:

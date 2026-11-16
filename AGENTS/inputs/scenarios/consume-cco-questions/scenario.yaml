@@ -1,0 +1,15 @@
+title: CCO asks the data (Ask-Your-Data)
+track: consume
+kind: agent
+agent: consume-ask-your-data
+tasks:
+- Which regions have the highest churn risk this week?
+- How much monthly revenue is at risk, by value segment?
+- What are the top churn drivers in Metro-North?
+context_files: []
+datasets:
+- gld_churn_risk
+- reference/semantic_metrics.yaml
+approvals: none (A0)
+live_duration_minutes: 2-4 live
+presenter_notes: Every answer shows SQL, lineage, freshness and confidence. Groups under 10 subscribers are suppressed.

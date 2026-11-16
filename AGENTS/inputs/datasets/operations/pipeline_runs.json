@@ -1,0 +1,28 @@
+[
+ {
+  "job": "mediation-file-feed",
+  "status": "lagging",
+  "lag_min": 118,
+  "sla_min": 30,
+  "host_cpu": "97%",
+  "scenario": "dataops"
+ },
+ {
+  "job": "dbt slv_subscriber_month",
+  "status": "failed",
+  "error": "column plan_code not found",
+  "downstream": [
+   "gld_churn_risk",
+   "care copilot features",
+   "Monday retention campaign"
+  ],
+  "scenario": "dataops"
+ },
+ {
+  "job": "gld_churn_risk_weekly",
+  "status": "at_risk",
+  "sla": "06:00",
+  "forecast_finish": "07:35",
+  "scenario": "dataops"
+ }
+]

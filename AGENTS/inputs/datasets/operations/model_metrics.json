@@ -1,0 +1,17 @@
+[
+ {
+  "model": "churn_gbm v7",
+  "psi": {
+   "data_throughput_p10": 0.31,
+   "tenure": 0.04,
+   "bill_shock": 0.08
+  },
+  "precision_top_decile": {
+   "all": 0.62,
+   "migrated_UL25": 0.41,
+   "not_migrated": 0.77
+  },
+  "validation_precision": 0.78,
+  "scenario": "mlops"
+ }
+]

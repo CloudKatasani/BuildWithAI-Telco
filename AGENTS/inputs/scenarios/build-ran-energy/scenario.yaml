@@ -1,0 +1,14 @@
+title: RAN energy savings data product
+track: build
+kind: pipeline
+request_file: request.md
+context_files:
+- context/team-standards.md
+datasets:
+- pm_cell_kpi
+- inventory_cell
+- gld_cell_energy_daily
+approvals: G0-G9
+live_duration_minutes: 12-20 live
+presenter_notes: Highlight that emergency-coverage cells are excluded by rule, and the cost estimate arithmetic
+  at G3.

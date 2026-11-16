@@ -16,7 +16,8 @@ from .llm import live_available
 from .registry import get_agent, load_skills, manifest, system_prompt
 from .runner import run_agent
 from .tools import Session
-from .workflows import Pipeline, build_pipeline, operate_pipeline
+from .inputs import list_scenarios, load_scenario
+from .workflows import Pipeline, build_pipeline, operate_pipeline, scenario_pipeline
 
 DEMO_DIR = Path(__file__).resolve().parent.parent.parent / "demo"
 SESSIONS: dict[str, Session] = {}
@@ -29,7 +30,7 @@ def _session(sid: str | None) -> Session:
     with _lock:
         if sid and sid in SESSIONS:
             return SESSIONS[sid]
-        s = Session()
+        s = Session(persist=True)
         SESSIONS[s.id] = s
         return s
 
@@ -42,7 +43,7 @@ def _find_approval(aid: str):
 
 
 def _session_state(s: Session) -> dict:
-    return {"session_id": s.id, "events": s.events[-300:], "approvals": [a.as_dict() for a in s.approvals.items.values()],
+    return {"session_id": s.id, "run_record": str(s.out_dir) if s.persist else None, "meta": s.meta, "events": s.events[-300:], "approvals": [a.as_dict() for a in s.approvals.items.values()],
             "artifacts": {k: v[:6000] for k, v in s.artifacts.items()}, "questions": s.questions,
             "audit": s.audit.entries[-100:], "audit_valid": s.audit.verify()}
 
@@ -103,6 +104,17 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.fullmatch(r"/api/pipelines/([\w-]+)", p)
         if m and m.group(1) in PIPELINES:
             return self._json(200, PIPELINES[m.group(1)].state())
+        if p == "/api/scenarios":
+            return self._json(200, list_scenarios())
+        if p == "/api/artifacts":
+            from .tools import artifacts_dir
+            runs = []
+            for d in sorted(artifacts_dir().glob("RUN-*"), reverse=True)[:50]:
+                try:
+                    runs.append(json.loads((d / "run.json").read_text()))
+                except (OSError, ValueError):
+                    continue
+            return self._json(200, runs)
         if p == "/api/approvals":
             return self._json(200, [a.as_dict() for s in SESSIONS.values() for a in s.approvals.items.values()])
         return self._json(404, {"error": "not found"})
@@ -116,6 +128,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(400, {"error": str(e)})
         p = self.path.split("?")[0]
         mode = body.get("mode") if body.get("mode") in ("live", "simulator") else None
+        model, effort = body.get("model") or None, body.get("effort") or None
+        from .runner import ALLOWED_EFFORT, ALLOWED_MODELS
+        if (model and model not in ALLOWED_MODELS) or (effort and effort not in ALLOWED_EFFORT):
+            return self._json(400, {"error": f"model must be one of {sorted(ALLOWED_MODELS)}; effort one of {sorted(ALLOWED_EFFORT)}"})
 
         m = re.fullmatch(r"/api/agents/([\w-]+)/run", p)
         if m:
@@ -132,7 +148,7 @@ class Handler(SimpleHTTPRequestHandler):
 
             def work():
                 try:
-                    res = run_agent(m.group(1), task, s, mode, str(body.get("context") or ""))
+                    res = run_agent(m.group(1), task, s, mode, str(body.get("context") or ""), model, effort)
                     run.update(status=res.status, final=res.final, usage=res.usage, mode=res.mode)
                 except Exception as e:  # noqa: BLE001
                     run.update(status="error", final=str(e))
@@ -144,11 +160,25 @@ class Handler(SimpleHTTPRequestHandler):
             track, req = body.get("track"), str(body.get("request") or "").strip()
             if track not in ("build", "operate") or not req:
                 return self._json(400, {"error": "track (build|operate) and request are required"})
-            pl = build_pipeline(req, mode) if track == "build" else operate_pipeline(req, mode)
+            sess = Session(persist=True)
+            kw = dict(session=sess, model=model, effort=effort, context=str(body.get("context") or ""))
+            pl = build_pipeline(req, mode, **kw) if track == "build" else operate_pipeline(req, mode, **kw)
             PIPELINES[pl.id] = pl
             SESSIONS[pl.session.id] = pl.session
             threading.Thread(target=pl.advance, daemon=True).start()
             return self._json(202, {"id": pl.id, "session_id": pl.session.id, "steps": pl.steps})
+
+        m = re.fullmatch(r"/api/scenarios/([\w-]+)/start", p)
+        if m:
+            try:
+                sc = load_scenario(m.group(1))
+                pl = scenario_pipeline(sc, mode, model, effort)
+            except (KeyError, ValueError) as e:
+                return self._json(404 if isinstance(e, KeyError) else 400, {"error": str(e)})
+            PIPELINES[pl.id] = pl
+            SESSIONS[pl.session.id] = pl.session
+            threading.Thread(target=pl.advance, daemon=True).start()
+            return self._json(202, {"id": pl.id, "session_id": pl.session.id, "steps": pl.steps, "run_record": str(pl.session.out_dir)})
 
         m = re.fullmatch(r"/api/approvals/([\w-]+)/decide", p)
         if m:

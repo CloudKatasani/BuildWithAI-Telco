@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 AGENTS/.runs/
 *.egg-info/
+AGENTS/artifacts/*
+!AGENTS/artifacts/README.md

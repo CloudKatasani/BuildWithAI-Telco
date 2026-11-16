@@ -1,0 +1,75 @@
+operator: NorthStar Telecom (fictional)
+synthetic: true
+seed: 42
+note: All values are generated. Personal-looking values (msisdn, full_name, date_of_birth) are fake but classified Restricted,
+  so the agents never read them.
+tables:
+  crm_customer:
+    file: tables/crm_customer.csv
+    rows: 6000
+    system: crm
+    classification: contains Restricted
+  billing_account:
+    file: tables/billing_account.csv
+    rows: 6000
+    system: billing
+    classification: contains Confidential
+  billing_invoice:
+    file: tables/billing_invoice.csv
+    rows: 12000
+    system: billing
+    classification: contains Confidential
+  xdr_daily:
+    file: tables/xdr_daily.csv
+    rows: 6000
+    system: xdr_lake
+    classification: contains Restricted
+  care_ticket:
+    file: tables/care_ticket.csv
+    rows: 922
+    system: care
+    classification: contains Internal
+  pm_cell_kpi:
+    file: tables/pm_cell_kpi.csv
+    rows: 1600
+    system: oss_pm
+    classification: contains Internal
+  inventory_cell:
+    file: tables/inventory_cell.csv
+    rows: 400
+    system: inventory
+    classification: contains Internal
+  gld_churn_risk:
+    file: tables/gld_churn_risk.csv
+    rows: 6000
+    system: gold
+    classification: Confidential (gold)
+  gld_cell_energy_daily:
+    file: tables/gld_cell_energy_daily.csv
+    rows: 400
+    system: gold
+    classification: Confidential (gold)
+  gld_recon_daily:
+    file: tables/gld_recon_daily.csv
+    rows: 6
+    system: gold
+    classification: Confidential (gold)
+  gld_account_sla:
+    file: tables/gld_account_sla.csv
+    rows: 8
+    system: gold
+    classification: Confidential (gold)
+reference:
+  source_metadata: reference/source_metadata.yaml
+  glossary: reference/glossary.yaml
+  sid: reference/sid.yaml
+  semantic_metrics: reference/semantic_metrics.yaml
+operations:
+  alarms: operations/alarms.json
+  changes: operations/changes.json
+  kedb: operations/kedb.json
+  topology: operations/topology.json
+  kpis: operations/kpis.json
+  pipeline_runs: operations/pipeline_runs.json
+  model_metrics: operations/model_metrics.json
+  cost_usage: operations/cost_usage.json
