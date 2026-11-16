@@ -689,8 +689,139 @@ agent_instructions: |
     </div>`;
   };
 
+  /* ---------------- Agents & skills (catalog + live runtime) ---------------- */
+  const AM = window.AGENTS_MANIFEST || { agents: [], skills: [], people: {} };
+  const RT = { checked: false, ok: false, mode: '', session: null, pipeline: null, timer: null, state: null, busy: false };
+  S.sel.agTrack = S.sel.agTrack || 'build';
+  S.sel.agent = S.sel.agent || (AM.agents.find((a) => a.track === 'build') || {}).id;
+  const TRACK_LABEL = { build: 'Build with AI', operate: 'Operate with AI', consume: 'Consume with AI' };
+  const SAMPLE_TASK = {
+    build: 'Build a weekly churn-risk data product so retention can act before contracts end. Care and marketing must use the same numbers.',
+    operate: 'Metro-North RAN cluster degradation: dropped-call rate up on 14 cells since 18:40.',
+    consume: 'Which regions have the highest churn risk this week?'
+  };
+
+  function probeRuntime() {
+    if (RT.checked) return;
+    RT.checked = true;
+    if (location.protocol === 'file:') { return; }
+    fetch('api/health', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((j) => {
+      if (j && j.ok) { RT.ok = true; RT.mode = j.mode; if (S.view === 'agents') render('agents', true); }
+    }).catch(() => {});
+  }
+
+  function pollRuntime() {
+    clearTimeout(RT.timer);
+    const url = RT.pipeline ? `api/pipelines/${RT.pipeline}` : RT.session ? `api/sessions/${RT.session}` : null;
+    if (!url) return;
+    fetch(url, { cache: 'no-store' }).then((r) => r.json()).then((j) => {
+      RT.state = j;
+      if (S.view === 'agents') { const el = document.getElementById('rt-out'); if (el) { el.innerHTML = runtimeOutHTML(); const c = el.querySelector('.console'); if (c) c.scrollTop = c.scrollHeight; } }
+      const active = RT.pipeline ? ['running', 'ready', 'waiting'].includes(j.status) : (j.runs || []).some((r) => r.status === 'running');
+      if (active) RT.timer = setTimeout(pollRuntime, 1200);
+    }).catch(() => { RT.timer = setTimeout(pollRuntime, 3000); });
+  }
+
+  function rtPost(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json().then((j) => ({ ok: r.ok, j })));
+  }
+
+  function runtimeOutHTML() {
+    const st = RT.state;
+    if (!st) return '<p class="sub">No runtime activity yet.</p>';
+    const ev = (st.events || []).slice(-60).map((e) => lineHTML({ t: e.ts, kind: e.kind === 'gate' ? 'gate' : e.kind === 'blocked' ? 'bad' : e.kind === 'done' ? 'ok' : 'agent', who: e.who, msg: e.text })).join('');
+    const pend = (st.approvals || []).filter((a) => a.status === 'pending');
+    const aps = pend.map((a) => `<div class="gate-card"><div class="gate-top"><span class="tag cls">${esc(a.action_class)}</span><h4>${esc(a.title)}</h4><span class="tag warn">Waiting for people</span></div>
+      <p class="sub">Requested by ${esc(a.requested_by)} · ${esc(a.id)} · hash ${esc(a.content_hash.slice(0, 16))}…</p>
+      <div class="signers">${a.approvers.map((r) => a.signatures[r] ? `<div class="signer signed"><span class="who"><b>${esc(a.signatures[r].person)}</b><small>${esc(r)}</small></span><span class="tag ok">Signed</span></div>` :
+        `<div class="signer"><span class="who"><b>${esc((AM.people || {})[r] || '')}</b><small>${esc(r)}</small></span><button class="btn sm ok" data-rt-sign="${esc(a.id)}" data-role="${esc(r)}">Approve</button></div>`).join('')}</div>
+      <div class="row"><button class="btn sm" data-rt-sign="${esc(a.id)}" data-role="${esc(a.approvers[0])}" data-decision="changes">Request changes</button><button class="btn sm danger" data-rt-sign="${esc(a.id)}" data-role="${esc(a.approvers[0])}" data-decision="reject">Reject</button></div></div>`).join('');
+    const finals = (st.runs || []).filter((r) => r.final).map((r) => `<details class="art" open><summary><span class="tag cls">${esc(r.mode || '')}</span>${esc(r.agent)} · ${esc(r.status)}</summary><pre class="code">${esc(r.final)}</pre></details>`).join('');
+    const arts = Array.isArray(st.artifacts) ? st.artifacts : Object.keys(st.artifacts || {});
+    return `<div class="stat-row"><div class="stat"><b>${esc(st.status || (st.runs || []).map((r) => r.status).join(', ') || '—')}</b><span>Status</span></div>
+      <div class="stat"><b>${(st.approvals || []).length}</b><span>Approval requests</span></div><div class="stat"><b>${arts.length}</b><span>Artifacts</span></div>
+      <div class="stat"><b>${st.audit_valid ? 'valid' : '—'}</b><span>Audit chain (SHA-256)</span></div></div>
+      ${aps}<div class="console">${ev || '<div class="empty">Waiting for events…</div>'}</div>${finals}
+      ${arts.length ? `<p class="sub">Artifacts: ${arts.map(esc).join(', ')}</p>` : ''}`;
+  }
+
+  VIEWS.agents = function () {
+    probeRuntime();
+    const track = S.sel.agTrack;
+    const list = AM.agents.filter((a) => a.track === track);
+    const a = AM.agents.find((x) => x.id === S.sel.agent && x.track === track) || list[0];
+    if (a) S.sel.agent = a.id;
+    const sk = (n) => AM.skills.find((s) => s.name === n) || { sections: [], lines: 0, description: '' };
+    const own = a ? sk(a.id) : null;
+    const plane = PLANE_VAR[track];
+    if (!AM.agents.length) return `<div class="page"><div class="empty-state">Agent catalog not found. Run <code>python -m telcocrew manifest</code> in AGENTS/.</div></div>`;
+    return `<div class="page" style="--plane:${plane}">
+      <div class="page-head"><span class="eyebrow">AGENTS/ · ${AM.agents.length} agents · ${AM.skills.length} skills</span>
+        <h1>The agents behind each track, with their skills and limits</h1>
+        <p class="lede">Each agent is a definition file plus a SKILL.md, loaded by the <code>telcocrew</code> runtime with the shared telco guardrails and domain pack. The runtime runs them on Claude with real tool calls, enforces the action class of every call, and turns production work into approval requests for the named people below.</p></div>
+      <div class="team-tabs">${['build', 'operate', 'consume'].map((t) => `<button class="btn" data-agtrack="${t}" aria-pressed="${t === track}">${TRACK_LABEL[t]} (${AM.agents.filter((x) => x.track === t).length})</button>`).join('')}</div>
+      <div class="run-layout">
+        <div class="scn-list">${list.map((x) => `<button class="scn" data-agent="${x.id}" aria-pressed="${x.id === a.id}"><b>${esc(x.title.replace(/ Agent$/, ''))}</b><small>${esc(x.phase || '')} · <span class="mono">${esc(x.max_action_class)}</span>${x.gate ? ' · ' + esc(x.gate) : ''}</small></button>`).join('')}</div>
+        <div class="stack" style="min-width:0">
+          <div class="panel"><div class="panel-head"><div class="stack" style="gap:4px"><h2>${esc(a.title)}</h2><p class="sub mono">${esc(a.id)} · ${esc(a.model)} · effort ${esc(a.effort)}</p></div>
+            <div class="row"><span class="tag cls">max ${esc(a.max_action_class)}</span>${a.gate ? `<span class="tag warn">Gate ${esc(a.gate)}</span>` : ''}<span class="tag">${esc(a.workspace)}</span></div></div>
+            <p>${esc(a.description || '')}</p>
+            <div class="grid g2" style="margin-top:12px">
+              <div><h4>Does</h4><ul class="bul sub">${(a.does || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+              <div><h4>Does not</h4><ul class="bul sub">${(a.does_not || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+              <div><h4>Expects</h4><ul class="bul sub">${(a.expects || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+              <div><h4>Produces</h4><ul class="bul sub">${(a.produces || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+            </div>
+            <h4 style="margin-top:12px">Human approvers</h4><div class="row">${a.approvers.length ? a.approvers.map((r) => `<span class="tag">${esc(r)} — ${esc((AM.people || {})[r] || '')}</span>`).join('') : '<span class="sub">None. This agent cannot change anything that needs approval.</span>'}</div>
+            <h4 style="margin-top:12px">Tools</h4><div class="row">${a.tools.map((t) => `<span class="tag cls">${esc(t)}</span>`).join('')}</div>
+            <h4 style="margin-top:12px">Skills loaded, in order</h4>
+            <ol class="bul" style="padding-left:20px">${a.skills.map((n) => `<li><b class="mono">${esc(n)}</b> <span class="sub">${esc((sk(n).description || '').slice(0, 170))}${(sk(n).description || '').length > 170 ? '…' : ''}</span></li>`).join('')}</ol>
+            ${own ? `<details class="art" style="margin-top:10px"><summary><span class="tag cls">SKILL.md</span>${esc(a.id)} · ${own.lines} lines<span class="sub">${own.sections.length} sections</span></summary><div style="padding:0 12px 12px"><div class="row">${own.sections.map((s) => `<span class="tag">${esc(s)}</span>`).join('')}</div><p class="sub" style="margin-top:8px">Full text: <code>AGENTS/${esc(track)}/skills/${esc(a.id)}/SKILL.md</code></p></div></details>` : ''}
+          </div>
+          <div class="panel"><div class="panel-head"><h3>Run this agent</h3>${RT.ok ? `<span class="tag ok">Runtime connected · ${esc(RT.mode === 'live' ? 'live (Claude)' : 'simulator')}</span>` : '<span class="tag">Runtime not connected</span>'}</div>
+            ${RT.ok ? `<div class="stack"><label class="sub" for="rt-task">Task</label><textarea id="rt-task" rows="3">${esc(SAMPLE_TASK[track])}</textarea>
+              <div class="row"><button class="btn primary" data-rt-run="${esc(a.id)}">Run ${esc(a.title)}</button>
+              ${track !== 'consume' ? `<button class="btn" data-rt-pipeline="${track}">Run the whole ${track} pipeline</button>` : ''}
+              <select id="rt-mode" aria-label="Mode"><option value="">Mode: server default</option><option value="simulator">Simulator</option><option value="live">Live (Claude)</option></select></div>
+              <div id="rt-out">${runtimeOutHTML()}</div></div>`
+              : `<p class="sub">This page is running without the agent runtime, so the catalog above comes from the bundled manifest. To run the agents for real, start the runtime and open the page it serves:</p>
+              <pre class="code">cd AGENTS
+pip install -r requirements.txt
+export ANTHROPIC_API_KEY=...        # omit to use the offline simulator
+python -m telcocrew serve           # then open http://127.0.0.1:8765/#agents</pre>
+              <p class="sub" style="margin-top:8px">Or from the command line: <code>python -m telcocrew run ${esc(a.id)} "${esc(SAMPLE_TASK[track].slice(0, 60))}…"</code></p>`}
+          </div>
+        </div>
+      </div></div>`;
+  };
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    const d = t.dataset;
+    if (d.agtrack) { S.sel.agTrack = d.agtrack; S.sel.agent = null; render('agents', true); }
+    else if (d.agent) { S.sel.agent = d.agent; render('agents', true); }
+    else if (d.rtRun || d.rtPipeline) {
+      const task = (document.getElementById('rt-task') || {}).value || '';
+      const mode = (document.getElementById('rt-mode') || {}).value || undefined;
+      const req = d.rtRun ? rtPost(`api/agents/${d.rtRun}/run`, { task, mode, session_id: RT.pipeline ? null : RT.session }) : rtPost('api/pipelines', { track: d.rtPipeline, request: task, mode });
+      req.then(({ ok, j }) => {
+        if (!ok) { toast(j.error || 'Request failed'); return; }
+        RT.pipeline = d.rtPipeline ? j.id : null; RT.session = j.session_id; RT.state = null;
+        audit('Runtime', d.rtRun ? 'agent.run' : 'pipeline.start', `${d.rtRun || d.rtPipeline}: ${task.slice(0, 80)}`);
+        pollRuntime();
+      });
+    } else if (d.rtSign) {
+      const decision = d.decision || 'approve';
+      rtPost(`api/approvals/${d.rtSign}/decide`, { role: d.role, decision, comment: decision === 'approve' ? '' : 'Reviewer comment from the demo page' }).then(({ ok, j }) => {
+        if (!ok) toast(j.error || 'Not allowed'); else toast(decision === 'approve' ? `Signed as ${d.role}` : decision === 'reject' ? 'Rejected' : 'Changes requested');
+        pollRuntime();
+      });
+    }
+  });
+
   /* ---------------- router ---------------- */
-  const NAV = ['overview', 'build', 'operate', 'consume', 'approvals', 'teams', 'research'];
+  const NAV = ['overview', 'build', 'operate', 'consume', 'agents', 'approvals', 'teams', 'research'];
   function render(view, keepScroll) {
     S.view = view;
     const y = window.scrollY;

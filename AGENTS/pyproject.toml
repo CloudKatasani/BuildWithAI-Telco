@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telcocrew"
+version = "1.0.0"
+description = "DataCrew Telco - Build, Operate and Consume AI agents with human approval gates"
+requires-python = ">=3.10"
+dependencies = ["anthropic>=0.75", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+telcocrew = "telcocrew.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["telcocrew*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
