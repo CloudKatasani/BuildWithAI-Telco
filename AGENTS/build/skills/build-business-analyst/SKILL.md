@@ -17,9 +17,9 @@ metadata:
 
 ## Mission
 
-Write requirements precise enough that mapping, build and test can proceed without asking what a
-term means. The Data Product Owner and the Data Steward approve them at G1, and the Quality
-Engineer later takes expected results from the worked examples.
+Write requirements precise enough that mapping, build and test can proceed without asking what a term means.
+The Data Product Owner and the Data Steward approve them at G1, and the Quality Engineer later takes
+expected results from the worked examples.
 
 ## Use when
 
@@ -47,41 +47,40 @@ Order is free; the pack is complete when these hold.
 
 - Each consumer has the decision the data supports and at least one `CQ` in their own words.
 - Each `CQ` points to the `BR` and `NFR` it depends on, and each `BR` serves at least one `CQ`.
-- Each `BR` has statement, scope, exclusions, a synthetic worked example and an acceptance
-  criterion. Terms were checked with `lookup_glossary` and anchored with `lookup_sid`.
-- `NFR` cover freshness, history depth, retention, access by role, and consent or lawful basis for
-  every use of personal data.
+- Each `BR` has statement, scope, exclusions, a synthetic worked example and an acceptance criterion. Terms
+  were checked with `lookup_glossary` and anchored with `lookup_sid`.
+- `NFR` cover freshness, history depth, retention, access by role, and consent or lawful basis for every use
+  of personal data.
 - Conflicts a person resolved are in `record_decision`; unanswered values are raised with
   `ask_open_question`.
-- Write `01-requirements/requirements.md`, read it back with `read_artifact`, fix any `CQ` without a
-  `BR` or `BR` without an example, then call `request_gate` and stop.
+- Write `01-requirements/requirements.md`, read it back with `read_artifact`, fix any `CQ` without a `BR` or
+  `BR` without an example, then call `request_gate` and stop.
 
 ## Decision rules
 
-- A rule is finished when a tester could compute its expected result from the worked example
-  alone. The Quality Engineer takes expected values from here, not from the code.
-- Two consumers with different definitions of one measure get one `BR` after a Data Product Owner
-  decision, not two rules. Care, marketing and finance have to report the same number.
-- A number nobody gave is an open question. A glossary or domain-pack value (for example at-risk
-  means score >= 0.7) may be used when the rule cites it.
-- "Real time" is not a requirement. Ask for the latency in minutes and the decision that needs it,
-  because the answer decides between batch and streaming cost at G3.
+- A rule is finished when a tester could compute its expected result from the worked example alone. The
+  Quality Engineer takes expected values from here, not from the code.
+- Two consumers with different definitions of one measure get one `BR` after a Data Product Owner decision,
+  not two rules. Care, marketing and finance have to report the same number.
+- A number nobody gave is an open question. A glossary or domain-pack value (for example at-risk means score
+  >= 0.7) may be used when the rule cites it.
+- "Real time" is not a requirement. Ask for the latency in minutes and the decision that needs it, because
+  the answer decides between batch and streaming cost at G3.
 - A `CQ` that needs personal data states the minimisation need: aggregate to groups of at least 10,
   pseudonymise, or drop. Mapping applies TEL-C1 and TEL-C4 from that note.
-- Marketing use of usage or billing data gets its own consent `BR` (TEL-C3), so the consent filter
-  is tested and not left to each consumer.
-- Requirements name business terms, not tables, columns or platforms. Choosing those here would
-  bind mapping and design before the evidence is in.
-- Worked examples use made-up case descriptions without identifiers. Anything shaped like a phone
-  number or email is redacted on write and would leave the example unreadable.
+- Marketing use of usage or billing data gets its own consent `BR` (TEL-C3), so the consent filter is tested
+  and not left to each consumer.
+- Requirements name business terms, not tables, columns or platforms. Choosing those here would bind mapping
+  and design before the evidence is in.
+- Worked examples use made-up case descriptions without identifiers. Anything shaped like a phone number or
+  email is redacted on write and would leave the example unreadable.
 
 ## Escalate to a person when
 
 - Consumers disagree on a definition and the sponsor has not decided: Data Product Owner.
-- A question needs subscriber location or call-record detail at row level: Security & Privacy
-  Officer.
-- The outcome in the brief cannot be measured by any question the consumers asked: Data Product
-  Owner, blocking.
+- A question needs subscriber location or call-record detail at row level: Security & Privacy Officer.
+- The outcome in the brief cannot be measured by any question the consumers asked: Data Product Owner,
+  blocking.
 
 ## Outputs
 
@@ -91,17 +90,17 @@ Order is free; the pack is complete when these hold.
 
 ```markdown
 # Requirements: <dp_name>
-## Business rules
+### Business rules
 ### BR-001 <name>   label: fact | assumption (owner) | open-question (role)
 Statement: <...>  Scope: <...>  Exclusions: <...>  Source of definition: <glossary | answer id | person>
 Worked example: <synthetic case and its expected result>
 Acceptance: <what a tester checks, against which expected value>
-## Non-functional requirements
+### Non-functional requirements
 NFR-001 <freshness | retention | access | consent>: <measurable statement> (control: TEL-Cn / STD-nn)
-## Consumer questions
+### Consumer questions
 CQ-001 "<question in the consumer's words>" - consumer, decision, depends on BR-..., NFR-...,
 minimisation: <none | aggregate >= 10 | pseudonymise>
-## Glossary gaps / Open questions
+### Glossary gaps / Open questions
 ```
 
 ## Definition of done
@@ -114,18 +113,18 @@ minimisation: <none | aggregate >= 10 | pseudonymise>
 
 ## Worked example
 
-Churn run. Attached answers: OQ-001 "churn window is 30 days for all post-paid lines, including
-SIM-only"; OQ-002 "lines in collections or fraud hold are excluded". Standards: STD-04, STD-05.
+Churn run. Attached answers: OQ-001 "churn window is 30 days for all post-paid lines, including SIM-only";
+OQ-002 "lines in collections or fraud hold are excluded". Standards: STD-04, STD-05.
 
-- `lookup_glossary` "churn": post-paid line disconnected or ported out within 30 days of the score
-  date. `lookup_sid` "subscription": Product, TMF637.
+- `lookup_glossary` "churn": post-paid line disconnected or ported out within 30 days of the score date.
+  `lookup_sid` "subscription": Product, TMF637.
 - BR-001 Churn, per glossary and OQ-001. Example: scored Monday, ported out 21 days later: churned;
   disconnected 34 days later: not churned.
-- BR-002 Exclude lines in collections or fraud hold (OQ-002). BR-003 Retention offers go only to
-  lines with marketing consent 'Y' (TEL-C3, STD-05).
+- BR-002 Exclude lines in collections or fraud hold (OQ-002). BR-003 Retention offers go only to lines with
+  marketing consent 'Y' (TEL-C3, STD-05).
 - NFR-001 List ready Monday 06:00 UTC (STD-04). NFR-002 Joins use the pseudonymous subscriber key.
-- CQ-001 "Which regions have the highest churn risk this week?" CQ-002 "How much monthly revenue is
-  at risk?" Both depend on BR-001; minimisation: aggregate >= 10.
+- CQ-001 "Which regions have the highest churn risk this week?" CQ-002 "How much monthly revenue is at
+  risk?" Both depend on BR-001; minimisation: aggregate >= 10.
 
 Rejected: BR "a line is at risk when its score is >= 0.8", because retention wants a shorter list.
 Why: the glossary sets at-risk at score >= 0.7; a different cut-off is a Data Product Owner decision.
@@ -138,4 +137,3 @@ Why: the glossary sets at-risk at score >= 0.7; a different cut-off is a Data Pr
 | Write "use `billing_invoice.total_amount`" in a rule | State the business term (billed amount); leave the column to Source Mapping |
 | Accept "real time" as stated | Ask for minutes and the decision that needs them |
 | Keep two definitions of churn to satisfy two consumers | Raise the conflict to the Data Product Owner and write one rule |
-| Renumber rules after a withdrawal | Mark the rule `withdrawn` and add new ones at the end |

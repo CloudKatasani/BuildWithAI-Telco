@@ -17,8 +17,8 @@ metadata:
 
 ## Mission
 
-Produce a design the Data Engineer can generate code from without further questions, with every
-significant choice recorded as an ADR and its cost shown. The Data Architect approves it at G3.
+Produce a design the Data Engineer can generate code from without further questions, with every significant
+choice recorded as an ADR and its cost shown. The Data Architect approves it at G3.
 
 ## Use when
 
@@ -26,8 +26,8 @@ significant choice recorded as an ADR and its cost shown. The Data Architect app
 - The platform, a team standard or a volume assumption changes.
 - Build, test or release returns something the design got wrong or left open.
 
-Not for: changing a mapping row, class or DQ rule (build-source-mapping); writing models or
-configs (build-data-engineer); release ordering and windows (build-release-engineer).
+Not for: changing a mapping row, class or DQ rule (build-source-mapping); writing models or configs
+(build-data-engineer); release ordering and windows (build-release-engineer).
 
 ## Inputs
 
@@ -45,47 +45,43 @@ configs (build-data-engineer); release ordering and windows (build-release-engin
 Design work, in any order; the file is ready when it contains all of these.
 
 - Logical model: entities, grain, keys and history, each aligned to a SID entity (`lookup_sid`).
-- Flow and physical objects: `brz_`, `slv_`, `gld_` names, load pattern (append, merge, full),
-  partitioning, latency per hop, and where each `DQ` rule runs with its action (block, quarantine,
-  warn).
+- Flow and physical objects: `brz_`, `slv_`, `gld_` names, load pattern (append, merge, full), partitioning,
+  latency per hop, and where each `DQ` rule runs with its action (block, quarantine, warn).
 - Security: masking per class, where pseudonymisation happens, row filters, each traced to an `NFR`.
-- Operability: idempotency, restart point, backfill, late-record handling, and the signals the
-  Operate track will watch (feed lag, run status, SLA forecast).
+- Operability: idempotency, restart point, backfill, late-record handling, and the signals the Operate track
+  will watch (feed lag, run status, SLA forecast).
 - Product boundary: output ports, owner, consumers, freshness SLO, quality guarantees.
 - ADRs, each logged with `record_decision`.
-- Cost from `estimate_platform_cost`. Copy the returned `arithmetic` line and state the source of
-  each input. If the total exceeds the budget, change an input you can justify and rerun, or present
-  options.
+- Cost from `estimate_platform_cost`. Copy the returned `arithmetic` line and state the source of each
+  input. If the total exceeds the budget, change an input you can justify and rerun, or present options.
 - Work packages.
-- Trace check: every `BR`, `NFR`, `MAP` and `DQ` id appears against a design element, or is listed as
-  not covered with a reason. Then `write_artifact`, `request_gate` on `03-design/design.md`, stop.
+- Trace check: every `BR`, `NFR`, `MAP` and `DQ` id appears against a design element, or is listed as not
+  covered with a reason. Then `write_artifact`, `request_gate` on `03-design/design.md`, stop.
 
 ## Decision rules
 
-- Six ADRs are mandatory because each is expensive to reverse: lake placement, table type, dbt
-  runtime, CDC apply mode, initial load, and CDR/xDR retention. Each states options, decision,
-  consequences, lock-in and reversal cost. An ADR you cannot decide is written as options with
-  status `needs-input`.
+- Six ADRs are mandatory because each is expensive to reverse: lake placement, table type, dbt runtime, CDC
+  apply mode, initial load, and CDR/xDR retention. Each states options, decision, consequences, lock-in and
+  reversal cost. An ADR you cannot decide is written as options with status `needs-input`.
 - Batch unless an `NFR` states a latency batch cannot meet; streaming costs more to run and to test.
 - Reuse an existing conformed silver or gold object before creating one, and say which.
-- Restricted source columns stop at bronze. Silver carries the pseudonymous key; gold carries no
-  identifier or location below the level the mapping allows.
-- Retention follows the mapping and TEL-C2. If a requirement needs longer history than allowed,
-  the design keeps aggregates and lets raw rows expire.
+- Restricted source columns stop at bronze. Silver carries the pseudonymous key; gold carries no identifier
+  or location below the level the mapping allows.
+- Retention follows the mapping and TEL-C2. If a requirement needs longer history than allowed, the design
+  keeps aggregates and lets raw rows expire.
 - The cost tool uses list-price demo rates. Say so beside the figure, and name the inputs that are
   assumptions.
-- Each work package names the generated files, the ids it implements, its acceptance criteria and
-  a sandbox check. The sandbox holds the source tables and the gold tables only, so the check is
-  phrased as a query over those (a row count, a control total, a uniqueness test).
-- This design is a specification. Models, configs and scripts are generated at the next stage and
-  run by client pipelines after their gates; describe them as designed, not deployed.
+- Each work package names the generated files, the ids it implements, its acceptance criteria and a sandbox
+  check. The sandbox holds the source tables and the gold tables only, so the check is phrased as a query
+  over those (a row count, a control total, a uniqueness test).
+- This design is a specification. Models, configs and scripts are generated at the next stage and run by
+  client pipelines after their gates; describe them as designed, not deployed.
 
 ## Escalate to a person when
 
-- The estimate exceeds the stated budget and no justified input change closes the gap: Data
-  Architect, with options.
-- Regulation and a requirement conflict on usage or location retention: Security & Privacy
-  Officer.
+- The estimate exceeds the stated budget and no justified input change closes the gap: Data Architect, with
+  options.
+- Regulation and a requirement conflict on usage or location retention: Security & Privacy Officer.
 - An existing data product would need a breaking change: Data Product Owner.
 - The design needs a tool or platform the team standards do not list: Data Architect.
 
@@ -97,17 +93,17 @@ Design work, in any order; the file is ready when it contains all of these.
 
 ```markdown
 # Design: <dp_name>
-## 1 Logical model      | Entity | SID | Grain | Key | History |
-## 2 Physical objects   | Object | Layer | Source(s) | Load pattern | Partition | DQ rules and action |
-## 3 Security           | Column or class | Control | NFR |
-## 4 Operability        idempotency, restart, backfill, late records, Operate signals
-## 5 Product boundary   output ports, owner, consumers, freshness SLO, guarantees (draft contract)
-## 6 ADRs
+### 1 Logical model      | Entity | SID | Grain | Key | History |
+### 2 Physical objects   | Object | Layer | Source(s) | Load pattern | Partition | DQ rules and action |
+### 3 Security           | Column or class | Control | NFR |
+### 4 Operability        idempotency, restart, backfill, late records, Operate signals
+### 5 Product boundary   output ports, owner, consumers, freshness SLO, guarantees (draft contract)
+### 6 ADRs
 ADR-001 <title> - status: decided | needs-input - options, decision, consequences, lock-in, reversal
-## 7 Cost               inputs with source, tool arithmetic, total, "list-price demo rates"
-## 8 Work packages
+### 7 Cost               inputs with source, tool arithmetic, total, "list-price demo rates"
+### 8 Work packages
 WP-1 <name>: files to generate, implements MAP-/BR-/DQ-, acceptance, sandbox check
-## 9 Traceability       | Requirement or rule id | Design element |
+### 9 Traceability       | Requirement or rule id | Design element |
 ```
 
 ## Definition of done
@@ -123,15 +119,15 @@ WP-1 <name>: files to generate, implements MAP-/BR-/DQ-, acceptance, sandbox che
 
 Churn run. Standards attached: STD-01 pseudonymous key, STD-03 dbt incremental with unique key.
 
-- `get_lineage` `gld_churn_risk`: complete; `slv_subscriber_month` from `billing_invoice`,
-  `billing_account` and `crm_customer` (pseudonymised key, consent); `slv_usage_day` from
-  `xdr_daily`. Decision: reuse both silver objects, extend `slv_subscriber_month` with `tariff_code`.
+- `get_lineage` `gld_churn_risk`: complete; `slv_subscriber_month` from `billing_invoice`, `billing_account`
+  and `crm_customer` (pseudonymised key, consent); `slv_usage_day` from `xdr_daily`. Decision: reuse both
+  silver objects, extend `slv_subscriber_month` with `tariff_code`.
 - ADR-004 CDC apply mode: merge on business key, deletes close the row. ADR-006 xDR retention:
   `needs-input`, Security & Privacy Officer (period not in the mapping).
-- `estimate_platform_cost` (2.1 h/day, 1 credit/h, 1.5 TB, 400 calls/day): "2.1 x 1 x 30 x EUR 2.8
-  + 1.5 x EUR 21 + 400 x 30 x EUR 0.004" = 176.40 + 31.50 + 48.00 = EUR 255.90 per month.
-- WP-1 `slv_subscriber_month`: implements MAP-002, DQ-004; sandbox check: invoice total per
-  `bill_month` equals the `billing_invoice` control total.
+- `estimate_platform_cost` (2.1 h/day, 1 credit/h, 1.5 TB, 400 calls/day): "2.1 x 1 x 30 x EUR 2.8 + 1.5 x
+  EUR 21 + 400 x 30 x EUR 0.004" = 176.40 + 31.50 + 48.00 = EUR 255.90 per month.
+- WP-1 `slv_subscriber_month`: implements MAP-002, DQ-004; sandbox check: invoice total per `bill_month`
+  equals the `billing_invoice` control total.
 
 Rejected: carry `xdr_daily.cell_id` into `slv_usage_day` to explain "dropped calls at home".
 Why: it is Restricted location and the mapping drops it; `dropped_calls` per day is enough.

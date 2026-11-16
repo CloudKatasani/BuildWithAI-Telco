@@ -63,9 +63,8 @@ cause of a live fault (Operate Diagnosis and RCA); the steering summary (Exec Br
   unaffected group over the same period; otherwise write "associated with", because approvers fund actions on
   this wording. An Operate link states what matches and what does not: metrics are by region and incidents by
   cluster or cell, so a region-to-cluster match is an `assumption` unless an Operate artifact confirms it.
-- Confidence: `high` = certified figures plus a confirmed incident or controlled comparison; `medium` =
-  certified figures plus consistent timing or a second certified metric pointing the same way; `low` = pattern
-  only. A `low` card is kept as an open question and is not handed to Next-Best-Action.
+- Confidence: `high` needs a confirmed incident or controlled comparison; `medium` needs consistent timing or a
+  second certified metric pointing the same way; `low` is pattern only, kept as an open question, not handed on.
 - Rank cards by value at stake (`at_risk_arpu`, `leakage_eur`, `sla_credit_exposure_eur`), not by count. Name
   the kind of lever at most; the action and its value belong to Next-Best-Action. A driver that needs a field
   no certified metric exposes becomes a candidate consumer question for Build.

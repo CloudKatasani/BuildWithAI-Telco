@@ -456,21 +456,27 @@ def query_metric(ctx: Ctx, a: dict):
         return {"error": f"Not a certified metric: {a['metric']}", "certified": list(data.METRICS)}
     dims = [d for d in (a.get("group_by") or []) if d in m["dims"]]
     bad = [d for d in (a.get("group_by") or []) if d not in m["dims"]]
-    where, params = [m["where"]], []
+    where, params, shown, ignored_filters = [m["where"]], [], [m["where"]], []
     for k, v in (a.get("filters") or {}).items():
         if k in m["dims"]:
             where.append(f"{k} = ?")
             params.append(v)
+            shown.append(f"{k} = '" + str(v).replace("'", "''") + "'")
+        else:
+            ignored_filters.append(k)
+    if ignored_filters:   # an unfiltered number presented as filtered would be a wrong answer
+        return {"error": f"Cannot filter {a['metric']} by {ignored_filters}: not an allowed dimension.", "allowed_dimensions": m["dims"]}
     sel = ", ".join(dims + [f"{m['expr']} AS value"] + (["COUNT(*) AS n"] if m["subscriber_level"] else []))
-    sql = f"SELECT {sel} FROM {m['table']} WHERE {' AND '.join(where)}" + (f" GROUP BY {', '.join(dims)} ORDER BY value DESC" if dims else "")
-    cols, rows = data.query(sql, tuple(params))
+    tail = f" GROUP BY {', '.join(dims)} ORDER BY value DESC" if dims else ""
+    cols, rows = data.query(f"SELECT {sel} FROM {m['table']} WHERE {' AND '.join(where)}{tail}", tuple(params))
     out = _rows(cols, rows)
     suppressed = 0
     if m["subscriber_level"]:
         for r in out:
-            if r.get("n", 0) < 10:
-                r["value"], suppressed = "suppressed (<10)", suppressed + 1
-    return {"metric": a["metric"], "description": m["desc"], "rows": out, "sql": sql.replace(m["table"], f"GOLD.{m['table']}"),
+            if r.get("n", 0) < 10:      # small-group suppression hides the count as well as the value
+                r["value"], r["n"], suppressed = "suppressed (<10)", "<10", suppressed + 1
+    sql = f"SELECT {sel} FROM GOLD.{m['table']} WHERE {' AND '.join(shown)}{tail}"
+    return {"metric": a["metric"], "description": m["desc"], "rows": out, "sql": sql,
             "lineage": data.LINEAGE.get(m["table"], []), "freshness": "2026-11-16 06:00 UTC", "ignored_dimensions": bad,
             "suppressed_groups": suppressed, "verified_questions": m["vq"]}
 
@@ -568,7 +574,8 @@ DESCRIPTIONS = {
                     "object. Call it first to find which metric answers a question; anything not listed is not certified.",
     "query_metric": "Compute one certified metric, optionally grouped by its allowed dimensions and filtered by dimension values. Returns rows, "
                     "the SQL that ran, lineage, freshness, verified questions and any dimensions that were ignored. For subscriber-level metrics, "
-                    "groups under 10 subscribers come back as suppressed. This is the only source of numbers for answers.",
+                    "groups under 10 subscribers come back as suppressed with their size hidden. A filter on anything but an allowed dimension is an "
+                    "error, and a group_by on one is listed under ignored_dimensions. This is the only source of numbers for answers.",
     "propose_business_action": "Propose a business action for human approval with its audience, expected value and checks. The approvers are set "
                                "by `action_type`: retention_offer, care_credit, rebill, network_change or enterprise_ticket. Creates an approval "
                                "request and executes nothing.",

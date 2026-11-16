@@ -1,11 +1,11 @@
 ---
 name: build-data-product-publisher
-description: Produces the publication package for a certified telco data product - versioned ODCS data contract, internal marketplace listing manifest, publication checklist and the Operate onboarding pack (signals, thresholds, KEDB seeds, proposed actions) - and publishes the listing after G9. Use after G8 is approved, or when a contract version changes.
+description: Produces the publication package for a certified telco data product - ODCS data contract limited to tested guarantees, internal marketplace listing, and the Operate onboarding pack with signals, known errors and proposed actions - requests G9, and in a second run publishes the listing with the G9 approval id. Use after the semantic view exists, when a contract version changes, or when G9 has been approved and the listing is to be published.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, lookup_glossary, get_lineage, register_catalog_asset, record_decision, ask_open_question, request_gate and publish_data_product tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: data-product-publisher
   gate: G9
@@ -17,128 +17,146 @@ metadata:
 
 ## Mission
 
-Publish a product consumers can trust and the Operate track can run: a contract that
-states only what was tested, and a handover that tells operators what to watch.
+Publish a product consumers can trust and the Operate track can run: a contract that states only what was
+designed and tested, a listing people can find, and a pack that tells operators what to watch. The Data
+Product Owner and the Data Steward approve at G9.
 
 ## Use when
 
-- G8 is approved for the semantic view and eval report.
-- A contract change (new column, new SLO) needs a new version.
+- The semantic view exists and the product needs its contract, listing and Operate pack (run 1).
+- The task says G9 is approved and the listing is to be published (run 2).
+- A contract change needs a new version.
 
-## Do not use for
-
-- Defining metrics or verified questions (Semantic and AI Context).
-- Granting consumer access (a person, through the access process).
-- Running the product after go-live (Operate track).
+Not for: metrics and verified questions (build-semantic-context); lineage evidence
+(build-governance-lineage); granting consumer access (a person, through the access process).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| `08-semantic/*` with G8 approval | yes |
-| `03-design/data-contract-draft.yaml` | yes |
-| `05-test/evidence-pack.md` and `07-release/*` with G7 approval | yes |
-| `control/governance/` lineage and classification evidence | yes |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Metrics, verified questions | `read_artifact` on `08-semantic/semantic-view.md` | List the gold object without certified metrics or sample questions; say so in the listing |
+| Output ports, SLOs, owner | `read_artifact` on `03-design/design.md` | Omit the SLO; a contract with no SLO is weaker but true. Ask the Data Product Owner |
+| Tested guarantees | `read_artifact` on `05-test/evidence.md` | Write no quality guarantees and state "no test evidence available" in the contract description |
+| Lineage per gold object | `get_lineage` | `complete: false`: prepare the package but hold the G9 request and ask the Data Steward (blocking) |
+| Glossary wording | `lookup_glossary` | Use the requirement's wording; list a glossary gap |
+| Known source issues, on-call owner | Earlier artifacts, attached context | Leave the KEDB seed list empty; ask the Service Delivery Manager for the on-call owner (non-blocking) |
+| G9 approval id (run 2 only) | Task text, attached context, or `read_artifact` on `09-publish/g9-request.md` | Ask the Data Product Owner for it (blocking) and stop; do not try ids |
 
-Reject the handoff if any contract column lacks lineage or classification.
+## Workflow
 
-## Tasks
+The order protects the approval: G9 covers the exact content of three files, and publication is class A3.
 
-1. **Write the ODCS contract.** From the design draft: dataset, schema with types and
-   classification, semantics from the glossary (`lookup_glossary`), quality guarantees
-   from tested `DQ-###`, freshness SLO, support, owner, version and change policy.
-2. **Check lineage** for every contract column with `get_lineage`; completeness must be
-   100 percent on contract columns.
-3. **Write the listing manifest.** Title, description, owner, domain, sample questions
-   from `VQ-###`, certified metrics, access request route, classification, terms of use.
-4. **Register catalog assets** in candidate status with `register_catalog_asset`.
-5. **Build the Operate onboarding pack.** Signals (freshness, volume, DQ failures, CDC
-   lag, cost, model PSI), thresholds from the design and tests, KEDB seeds `KE-###` from
-   defects and known source issues, proposed actions `ACT-###` with class, rollback and
-   verify step, and the owner on call.
-6. **Write the publication checklist.** Contract versioned, lineage complete, listing
-   reviewed, Operate pack delivered, access route defined, evidence links per item.
-7. **Record decisions** with `record_decision`; raise open questions for missing owners.
-8. **Request G9** with `request_gate`, listing contract, manifest, checklist and Operate
-   pack, then stop.
-9. **Publish** after G9 with `publish_data_product`, passing the G9 approval id. Record
-   the listing reference and hand the Operate pack to `operate-watch-desk`.
+Run 1, prepare:
+1. Write `09-publish/contract.odcs.yaml` from the design's product boundary, the semantic view and the test
+   evidence.
+2. Call `get_lineage` for every output-port object. All have to be complete before step 6.
+3. Write `09-publish/listing.yaml` and `09-publish/operate-pack.yaml`.
+4. Call `register_catalog_asset` for the product and each output port. Assets are created as candidates; the
+   tool appends to `09-publish/catalog-candidates.jsonl` itself.
+5. Read the three files back and check each guarantee against its evidence. Log choices such as an omitted
+   SLO with `record_decision`.
+6. Call `request_gate` listing the contract, listing and Operate pack.
+7. Write `09-publish/g9-request.md` with the returned approval id and the three hashes, then stop. Run 2
+   starts with no memory of run 1, and this note is how it finds the id. It is not one of the approved
+   files, so writing it does not affect the request.
+
+Run 2, publish (only when the task states that G9 is approved):
+1. Do not rewrite any file in `09-publish/`. Approvers signed that content.
+2. Call `publish_data_product` with the approval id and `listing_path` `09-publish/listing.yaml`.
+3. If the call is refused, report the refusal text and stop. If it returns `listed`, log it with
+   `record_decision` and hand the Operate pack to operate-watch-desk in the handoff.
 
 ## Decision rules
 
-- The contract states only tested guarantees; an untested promise is removed.
-- A breaking change (removed or retyped column, tighter semantics) is a new major
-  version with consumer-owner sign-off.
-- Lineage below 100 percent on contract columns blocks G9.
-- The approval id must match the hashes of the artifacts listed at G9; any change after
-  approval means a new G9.
-- Every proposed action in the Operate pack has a class, a rollback and a verify step.
-- Restricted columns are not in the listing; the contract lists them only if a governed
-  access route exists.
+- A guarantee enters the contract only with evidence: a `DQ` rule that was executed and passed, an SLO the
+  design set. An attractive but untested promise is left out, because consumers and the Operate track will
+  hold the owner to it.
+- Contract columns are the gold columns as built. Restricted columns are not listed; the listing describes
+  aggregates and the access request route, never a way around masking.
+- A removed or retyped column, or a tighter definition, is a new major version and needs the consuming
+  owners named in the G9 summary.
+- Contract, listing and Operate pack carry the same version.
+- Signals in the Operate pack are ones the Operate track can observe: feed lag, model run status, SLA
+  forecast, PSI per feature, spend against budget. Each has a threshold with its source.
+- Each proposed action has a class (A2 or A3), a rollback, a verification step and an approver role. The
+  pack proposes; it executes nothing.
+- A known source issue found during the build becomes a KEDB seed with symptoms, check and fix, so the first
+  incident is not diagnosed from scratch.
+- Any change to the three files after the G9 request needs a new request.
 
-## Do not
+## Escalate to a person when
 
-- Call `publish_data_product` before G9 or with an approval id for other artifacts.
-- Grant, request or pre-approve access for any consumer.
-- Copy SLOs from another product.
-- Leave the Operate pack as a later task.
-
-## Escalate to the human when
-
-- A consumer needs a guarantee that was not tested.
-- An existing contract would break.
-- No on-call owner exists for the Operate track.
-- The listing must show a Restricted column to be useful.
-
-## Enterprise controls
-
-- Contract, listing and Operate pack carry the same version and are bound at G9.
-- Catalog assets stay candidate until the Data Steward certifies them.
-- Publication is A3: two approvers and a recorded approval id.
-- The Operate pack is the only route for proposed actions; it does not execute them.
-
-## Self-review before handover
-
-- *Accuracy.* Every contract column, metric and guarantee matches the design, the tests
-  and the semantic view, and lineage is complete.
-- *Risk.* No untested guarantee, no Restricted column without an access route, and
-  publication only with a matching G9 approval id.
-- *Handover.* The Operate track can start monitoring from the pack alone: signals,
-  thresholds, KEDB seeds, actions and owners.
+- A consumer needs a guarantee that was not tested: Data Product Owner.
+- An existing contract would break: Data Product Owner and the consuming owners.
+- No on-call owner exists for the product: Service Delivery Manager.
+- The listing is only useful if it shows a Restricted column: Security & Privacy Officer.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Data contract | `09-publish/contract.odcs.yaml` | ODCS schema, semantics, quality, SLO, version |
-| Listing manifest | `09-publish/listing-manifest.yaml` | Title, owner, metrics, sample questions, access route |
-| Publication checklist | `09-publish/publication-checklist.md` | Items with evidence links |
-| Operate pack | `09-publish/operate-onboarding-pack.yaml` | Signals, thresholds, `KE-###`, `ACT-###`, owners |
-| Publication record | `09-publish/publication-record.md` | Approval id, listing reference, timestamp |
+| Data contract | `09-publish/contract.odcs.yaml` | ODCS: schema with classes, quality, SLA, owner, version |
+| Listing | `09-publish/listing.yaml` | Title, description, owner, domain, metrics, sample questions, access route |
+| Operate pack | `09-publish/operate-pack.yaml` | Signals, thresholds, KEDB seeds, proposed actions, owner |
+| Request note | `09-publish/g9-request.md` | G9 approval id and the hashes of the three files |
+
+```yaml
+apiVersion: v3.0.0
+kind: DataContract
+id: <dp_name>
+version: 1.0.0
+status: proposed            # active only after publication
+owner: <role or name>
+schema:
+  - name: <gold object>
+    properties:
+      - {name: <column>, logicalType: <type>, classification: <class>, description: <glossary>}
+    quality:
+      - {rule: <DQ-nnn>, type: <check>, evidence: <TC-nnn in 05-test/evidence.md>}
+slaProperties:
+  - {property: freshness, value: <from NFR>, evidence: <NFR id>}
+
+# operate-pack.yaml
+signals:   [{name: <signal>, source: <feed or model>, threshold: <value>, threshold_source: <id>}]
+kedb_seed: [{id: <KE id>, symptoms: <...>, check: <...>, fix: <...>}]
+actions_proposed: [{name: <...>, class: A2, rollback: <...>, verify: <...>, approver: <role>}]
+on_call: <role>
+```
 
 ## Definition of done
 
-1. ODCS contract versioned and limited to tested guarantees.
-2. Lineage complete on every contract column.
-3. Operate onboarding pack delivered with signals, KEDB seeds and actions.
-4. G9 approved by the Data Product Owner and the Data Steward.
-5. Listing published with the G9 approval id and the record written.
+- [ ] Every quality guarantee and SLO in the contract cites a `TC`, `DQ` or `NFR` id.
+- [ ] `get_lineage` is complete for every output port; no Restricted column is in the contract.
+- [ ] The Operate pack has signals with thresholds, proposed actions with rollback, and an owner.
+- [ ] The three files share one version and were not changed after the G9 request; the approval id is noted
+      in `g9-request.md`.
+- [ ] Run 2 only: the listing was published with the approval id, or the refusal is reported.
 
 ## Worked example
 
-Energy run, product `dp_ran_energy_efficiency` v1.0.0. Contract: `gld_cell_energy_daily`,
-freshness SLO 07:00 daily, `DQ-002` counter completeness >= 98% per cell-day. Operate
-pack: signal "PM topic lag > 30 min" warn; `KE-012` "smart-meter file arrives late on
-Mondays, rerun at 09:00"; `ACT-004` "rerun energy gold for one day", class A2, rollback
-"restore previous partition", verify "row count = cells x 1".
-Rejected: state in the contract that sleep-candidate lists are "real time".
-Why: the design and tests cover a daily refresh only; the contract states 07:00 daily.
+Run 1, `dp_subscriber_churn_360` v1.0.0, output port `gld_churn_risk`.
 
-## Common failure modes
+- `get_lineage` `gld_churn_risk`: complete.
+- Contract: 7 columns, class Confidential; quality `unique` on `subscriber_key` (TC-002, 6,000 of 6,000);
+  freshness "Monday 06:00 UTC" (NFR-001).
+- Operate pack: signal "mediation feed lag", threshold 30 min; signal "`slv_subscriber_month` run failed";
+  seed KE-1189 "source column renamed without notice (RN-772, `plan_code` to `tariff_code`)"; action "rerun
+  model", class A2, approver Service Delivery Manager.
+- `register_catalog_asset` `gld_churn_risk`, table, Confidential: status candidate.
+- `request_gate` on the three files: approval id returned, noted in `g9-request.md`; stopped.
 
-| Failure | Prevention |
+Run 2: task says G9 is approved. `read_artifact` on `09-publish/g9-request.md` gives the id;
+`publish_data_product` returned `status: listed`, marketplace internal.
+
+Rejected: add "availability: 99.5%" to the contract because marketplace listings usually show one.
+Why: no `NFR` set an availability target and nothing tested it.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Contract promises untested SLOs | Guarantees copied only from tested DQ and design |
-| Operate pack missing at go-live | G9 not requested without it |
-| Published before approval | Approval id required by the publish tool |
-| Lineage gaps on contract columns | 100 percent check before G9 |
+| Call `publish_data_product` in the same run as `request_gate` | Stop after the request; publish only in a run whose task says G9 is approved |
+| Tidy a file in `09-publish/` before publishing | Leave it; a change means a new G9 |
+| Copy SLOs from another product's contract | Use only this product's `NFR` and test evidence |
+| Retry publication with another id after a refusal | Report the refusal and ask the Data Product Owner |
+| Leave the Operate pack for later | Write it now; G9 covers all three files |

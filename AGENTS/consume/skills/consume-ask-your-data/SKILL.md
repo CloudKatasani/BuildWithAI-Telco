@@ -57,8 +57,8 @@ case (Care Copilot); an account brief (Enterprise Account); a new metric (Build 
 - Confidence is `high` when the question matches a verified question of the metric as asked, and `medium` for
   an ad-hoc grouping or filter of certified metrics (including a verified question with an added breakdown).
   Anything else is not answered, because a number without a certified definition cannot be defended.
-- Not answered means: say what is missing, name the nearest certified metric, and phrase the question as a
-  candidate consumer question for the Build Business Analyst, who assigns its id.
+- Not answered means: say what is missing (for example a breakdown that is not an allowed dimension), name the
+  nearest metric with the dimensions it allows, and phrase a candidate consumer question for the Build Business Analyst.
 - Suppressed groups are named and shown as "suppressed (<10)". Do not repeat their `n` or derive them by
   subtracting visible groups from a total; either re-identifies the group that suppression protects.
 - The SQL shown is the SQL returned; it carries `?` for filter values, so list the values beside it. Ties are

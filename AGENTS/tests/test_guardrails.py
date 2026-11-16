@@ -139,7 +139,17 @@ def test_a4_actions_are_never_proposed():
     assert err and "A4" in res["error"]
 
 
-def test_small_groups_are_suppressed():
-    res, _ = run_tool(ctx("consume-ask-your-data"), "query_metric", {"metric": "churn_at_risk_lines", "group_by": ["region", "top_driver"],
-                                                                   "filters": {"region": "Coastal"}})
-    assert any(r["value"] == "suppressed (<10)" for r in res["rows"]) or all(r["n"] >= 10 for r in res["rows"])
+def test_small_groups_are_suppressed_including_their_size():
+    c = ctx("consume-ask-your-data")
+    res, _ = run_tool(c, "query_metric", {"metric": "churn_at_risk_lines", "group_by": ["region", "top_driver"]})
+    hidden = [r for r in res["rows"] if r["value"] == "suppressed (<10)"]
+    assert hidden and all(r["n"] == "<10" for r in hidden) and res["suppressed_groups"] == len(hidden)
+    assert all(r["n"] >= 10 for r in res["rows"] if r not in hidden)
+
+
+def test_filter_on_a_non_dimension_is_an_error_not_a_silent_drop():
+    c = ctx("consume-ask-your-data")
+    res, err = run_tool(c, "query_metric", {"metric": "churn_at_risk_lines", "filters": {"age_band": "18-25"}})
+    assert err and "allowed_dimensions" in res
+    res, _ = run_tool(c, "query_metric", {"metric": "churn_at_risk_lines", "filters": {"region": "Metro-North"}})
+    assert "region = 'Metro-North'" in res["sql"]

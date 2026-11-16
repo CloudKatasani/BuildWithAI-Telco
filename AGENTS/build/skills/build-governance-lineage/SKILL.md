@@ -1,11 +1,11 @@
 ---
 name: build-governance-lineage
-description: Produces governance evidence across a telco data product build - glossary drafts, classification sync between mapping and catalog, catalog candidates, and column lineage completeness from gold back to BSS, OSS and CDR sources - delivered at G2, G3, G7 and G9. Use alongside every Build stage, whenever a stage writes artifacts, and before each of those gates.
+description: Produces governance evidence alongside a telco data product build - classification sync between the mapping and source metadata, glossary gaps with draft terms, catalog candidates, and lineage completeness per gold and contract column - as input for approvers at G2, G3, G7 and G9. Use whenever a Build stage has written artifacts, before each of those gates, or when a classification or lineage question is raised.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, list_source_metadata, lookup_glossary, lookup_sid, get_lineage, register_catalog_asset, record_decision and ask_open_question tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: governance-lineage
   gate: none
@@ -17,129 +17,128 @@ metadata:
 
 ## Mission
 
-Keep the glossary, classification, catalog and lineage true to what is being built, so
-every approver sees governance evidence instead of a promise.
+Give gate approvers evidence they can check: whether classification in the build matches the source
+metadata, which terms the glossary lacks, what is registered in the catalog, and whether every gold column
+can be traced to a source. The Data Steward acts on what this agent reports.
 
 ## Use when
 
-- Any Build stage writes or changes artifacts.
-- G2, G3, G7 or G9 is about to be requested.
-- The catalog or glossary changes under a running build.
+- A Build stage has written or changed artifacts and governance evidence should catch up.
+- G2, G3, G7 or G9 is about to be decided.
+- Someone asks whether a column is classified correctly or where a gold column comes from.
 
-## Do not use for
-
-- Certifying glossary terms or assets (Data Steward).
-- Classifying new columns from scratch (Source Mapping Analyst).
-- Granting access or changing policies (Security & Privacy Officer).
+Not for: writing the mapping or changing a class in it (build-source-mapping); test evidence
+(build-quality-engineer); the contract and listing (build-data-product-publisher).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| Stage artifacts in `01-requirements/` to `09-publish/` | yes |
-| Business glossary and catalog state | yes |
-| `control/domain-pack.yaml` classification and retention rules | yes |
-| Lineage from GoldenGate, Kafka connectors, dbt and the semantic layer | from G4 on |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Artifacts written so far | `read_artifact` without a path, then each relevant file | Cover what exists and mark later sections "not yet available"; a pass on an early run is normal |
+| Source classes and descriptions | `list_source_metadata` | The tool is the reference; a table absent from it is reported as "unknown source" to the Data Steward |
+| Mapping classes and `MAP` rows | `read_artifact` on `02-mapping/mapping.md`, `02-mapping/source-inventory.csv` | Report classification straight from metadata and state that no mapping was available to compare |
+| Lineage per gold object | `get_lineage` | `complete: false` or an empty list: report the object as "no lineage registered" |
+| Gold and contract columns | `read_artifact` on `03-design/design.md`, `09-publish/contract.odcs.yaml` | Use the gold object named in the brief or task; mark the column list `assumption` |
+| Glossary and SID entries | `lookup_glossary`, `lookup_sid` | No match is itself the finding: record a glossary gap |
 
-Stop the pass if the catalog cannot be read; report the gap instead of assuming state.
+## Workflow
 
-## Tasks
+Each pass rewrites one evidence file covering whatever exists at that point. Sections map to the gates:
+classification (G2), lineage plan (G3), lineage on built objects (G7), lineage on contract columns (G9).
 
-1. **Draft glossary terms.** For each glossary gap in requirements, check
-   `lookup_glossary` and `lookup_sid`, then draft term, definition, SID entity, synonyms
-   and proposed steward. Status: draft.
-2. **Sync classification (G2 evidence).** Compare `02-mapping/classification.csv` with
-   catalog tags using `list_source_metadata`. Report every mismatch (MSISDN tagged
-   Internal in the catalog but Restricted in the mapping) with the stricter class kept
-   until the Data Steward decides.
-3. **Check the lineage plan (G3 evidence).** Confirm the design names lineage capture
-   points for each hop and every Restricted attribute.
-4. **Register catalog candidates** with `register_catalog_asset` for bronze, silver and
-   gold objects and the semantic view, in draft or candidate status, with owner, domain,
-   classification and glossary links.
-5. **Measure lineage completeness (G7 evidence).** With `get_lineage`, trace each
-   released gold column back to a source column. Count scanned, automatic,
-   custom-declared and missing.
-6. **Measure contract lineage (G9 evidence).** Repeat for every contract column; the
-   target is 100 percent.
-7. **Record decisions** from the steward with `record_decision`; raise mismatches and
-   gaps with `ask_open_question` to the Data Steward.
-8. **Write the evidence file** for the next gate and stop.
+- Classification sync. For every column in the mapping, compare its class with `list_source_metadata`. List
+  each mismatch with both values.
+- Glossary. Check each business term in the requirements and mapping with `lookup_glossary`. For a gap,
+  draft term, definition, SID entity (`lookup_sid`), synonyms and proposed steward, status `draft`.
+- Lineage. Call `get_lineage` for each gold object. Then, column by column, find the `MAP` row or lineage
+  line that reaches a source column, and count traced, declared and missing.
+- Catalog. Call `register_catalog_asset` once per product and gold object not yet in
+  `control/governance/catalog-candidates.jsonl`. The tool appends to that file; read it first to avoid
+  duplicates, and do not write to it directly.
+- Raise mismatches and gaps to the Data Steward with `ask_open_question`; log what a person has already
+  decided with `record_decision`.
+- Write `control/governance/lineage-completeness.md` and end with the handoff. This agent has no gate and
+  requests none.
 
 ## Decision rules
 
-- When mapping and catalog disagree on classification, the stricter class applies until
-  the steward decides.
-- Custom-declared lineage counts only if it names the source column and the rule.
-- A gold column with lineage ending at bronze, not at a source, is incomplete.
-- Glossary drafts never overwrite an existing certified term; they propose a change.
-- Catalog assets stay draft or candidate; certification is the steward's action.
-- Restricted attributes need column-level lineage, table-level is not enough.
+- When the mapping and metadata disagree on a class, report the stricter one as applying until the Data
+  Steward decides. You report the mismatch; the mapping is corrected by its own agent.
+- Class is per table, not per column name. `cell_id` in `xdr_daily` is Restricted (a subscriber's location);
+  in `pm_cell_kpi` and `inventory_cell` it is Internal. Compare like with like.
+- The `complete` flag from the lineage tool is per object. Column completeness is your own count: a column
+  is `traced` when a lineage line and a `MAP` row agree on its source column, `declared` when only a `MAP`
+  row names the source column and rule, and `missing` otherwise.
+- Lineage that ends at a bronze or silver object is incomplete; it has to reach a source table.
+- A column produced by a model (a score, a driver) traces to the model and its card, and the card's feature
+  list has to trace onward.
+- Every Restricted source column needs an explicit end point: dropped, or pseudonymised into a named key.
+  "Not used" without a `MAP` decision is a finding.
+- Contract columns need 100 percent traced or declared before G9. Report the figure and the missing columns;
+  the approvers decide what to do with a shortfall.
+- Glossary entries here are drafts and catalog assets are candidates. Certifying either is the Data
+  Steward's act, and a draft does not replace an existing term.
 
-## Do not
+## Escalate to a person when
 
-- Certify, deprecate or delete catalog assets or glossary terms.
-- Lower a classification, even when the catalog shows a lower one.
-- Write into any stage workspace or edit another agent's files.
-- Read business rows; metadata and lineage only.
-
-## Escalate to the human when
-
-- A Restricted column appears in an object or view whose design does not allow it.
-- Lineage completeness on contract columns is below 100 percent before G9.
-- Two stewards claim the same term with different definitions.
-- The catalog shows an asset with the product's name owned by another team.
-
-## Enterprise controls
-
-- Evidence files are dated, versioned and bound to the gate they support.
-- Every catalog candidate carries owner, steward, classification and retention.
-- Lineage counts are reproducible: the scan list is stored with the result.
-- Mismatches stay open in the evidence until the steward closes them.
-
-## Self-review before handover
-
-- *Accuracy.* Every count in the evidence (columns scanned, automatic, custom, missing)
-  adds up and comes from a stored scan list.
-- *Risk.* Every classification mismatch is reported with the stricter class applied, and
-  no asset was certified by the agent.
-- *Handover.* The gate approvers can read the evidence file alone and see what is
-  complete, what is missing and who owns each gap.
+- A Restricted column reaches silver, gold or a contract in clear: Security & Privacy Officer and Data
+  Steward, immediately.
+- Contract-column lineage is below 100 percent when G9 is near: Data Steward and Data Product Owner.
+- Two stewards or two definitions exist for one term: Data Steward.
+- A catalog candidate with the product's name already exists from another team: Data Product Owner.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Glossary drafts | `control/governance/glossary-drafts.md` | Term, definition, SID entity, steward |
-| Classification sync | `control/governance/classification-sync.md` | Mapping vs catalog, mismatches, decisions |
-| Catalog candidates | `control/governance/catalog-candidates.yaml` | Assets registered, status, owner |
-| Lineage report | `control/governance/lineage-completeness.md` | Scanned, automatic, custom, missing |
-| Gate evidence | `control/governance/evidence-G#.md` | Evidence for G2, G3, G7 and G9 |
+| Governance evidence | `control/governance/lineage-completeness.md` | Classification sync, glossary drafts, lineage counts, catalog candidates, open items |
+| Catalog candidates | `control/governance/catalog-candidates.jsonl` | Written by the catalog tool: name, type, class, status candidate |
+
+```markdown
+# Governance evidence: <dp_name>          pass: <n>, artifacts covered: <list>
+### Classification sync (G2)   checked: <n> columns, mismatches: <n>
+| Table.column | Mapping class | Metadata class | Applies until decided | Raised to |
+### Glossary gaps and drafts   | Term | Draft definition | SID entity | Proposed steward | Status: draft |
+### Lineage plan (G3)          capture point per hop: present | missing | not yet available
+### Lineage completeness (G7, G9)
+| Gold object | Tool flag | Columns | Traced | Declared | Missing |
+| Column | Source table.column or model | Via (MAP id / lineage line) | Status |
+### Restricted columns         | Source column | End point (dropped / pseudonymised into <key>) |
+### Catalog candidates         | Name | Type | Class | Status |
+### Open items for the Data Steward
+```
 
 ## Definition of done
 
-1. Glossary gaps from requirements have drafts with proposed stewards.
-2. Classification mismatches are reported before G2.
-3. Catalog candidates exist for every gold object and the semantic view.
-4. Lineage completeness is 100 percent on contract columns before G9.
-5. Evidence files exist for G2, G3, G7 and G9.
+- [ ] Every mapped column was compared with metadata, and each mismatch shows both classes.
+- [ ] Every gold column in scope has a status of traced, declared or missing, with its source.
+- [ ] Every Restricted source column in scope has a recorded end point or a finding.
+- [ ] Each finding is raised to a named role; nothing was corrected in another agent's artifact.
+- [ ] Sections for gates not yet reachable say "not yet available" instead of being left out.
 
 ## Worked example
 
-Churn run, G7 evidence: 31 contract columns scanned in `gld_churn_risk_weekly`; 25 with
-automatic lineage from dbt and GoldenGate, 6 custom-declared (NPS file drop, parsed by
-the batch framework), 0 missing: completeness 100 percent. Classification sync: catalog
-tagged `CONTRACT.MSISDN` as Internal, mapping says Restricted; Restricted kept and the
-mismatch sent to the Data Steward.
-Rejected: count the 6 NPS columns as complete because the table-level lineage exists.
-Why: table-level lineage does not show which source field feeds which column; each was
-custom-declared with the source field and rule before being counted.
+Churn run, pass after the mapping and design exist.
 
-## Common failure modes
+- `list_source_metadata`: `xdr_daily.cell_id` Restricted. The inventory file lists it as Internal. Mismatch
+  reported; Restricted applies; `ask_open_question` to the Data Steward (blocking for G2).
+- `lookup_glossary` "value segment": no match. Draft term written, proposed steward Data Steward.
+- `get_lineage` `gld_churn_risk`: complete, four lines (`slv_subscriber_month` from `billing_invoice`,
+  `billing_account`, `crm_customer`; `slv_usage_day` from `xdr_daily`; model churn_gbm v7).
+- Column count: 7 columns. `subscriber_key`, `region`, `value_segment`, `arpu` traced; `risk_score`,
+  `top_driver` traced to the model (MC-07); `churned_30d` has no `MAP` row: missing. 6 of 7.
+- `msisdn`, `full_name`, `date_of_birth`: end point "dropped" in the mapping.
+- `register_catalog_asset` `gld_churn_risk`, table, Confidential: candidate.
 
-| Failure | Prevention |
+Rejected: report lineage as 100 percent because the tool returned `complete: true`.
+Why: that flag is per object; `churned_30d` has no source column on record.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Lineage stops at bronze | Completeness counted back to source columns |
-| Catalog shows a weaker class | Stricter class kept, steward decides |
-| Agent certifies its own drafts | Draft and candidate status only |
-| Evidence prepared after the gate | Evidence file written before each gate request |
+| Fix a wrong class in the mapping or inventory | Report the mismatch with both values and raise it to the Data Steward |
+| Take `complete: true` as column-level proof | Count columns against `MAP` rows and lineage lines |
+| Mark a draft term or candidate asset as certified | Leave status `draft` or `candidate` |
+| Register the same asset on every pass | Read the candidates file first and register only new assets |
+| Skip a section because its inputs do not exist yet | Keep the section and write "not yet available" |

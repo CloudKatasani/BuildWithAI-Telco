@@ -17,9 +17,9 @@ metadata:
 
 ## Mission
 
-Show where every required attribute comes from, which SID entity it belongs to, how sensitive it
-is and how it arrives, with evidence from metadata and profiles. The Data Steward and the Security
-& Privacy Officer approve at G2; design, build and test all work from these two files.
+Show where every required attribute comes from, which SID entity it belongs to, how sensitive it is and how
+it arrives, with evidence from metadata and profiles. The Data Steward and the Security & Privacy Officer
+approve at G2; design, build and test all work from these two files.
 
 ## Use when
 
@@ -27,9 +27,8 @@ is and how it arrives, with evidence from metadata and profiles. The Data Stewar
 - A source system, table or attribute is added or renamed.
 - A later stage returns a mapping row or a DQ rule as wrong.
 
-Not for: defining rules or thresholds (build-business-analyst); physical tables, load patterns in
-the target or cost (build-solution-architect); catalog and lineage evidence
-(build-governance-lineage).
+Not for: defining rules or thresholds (build-business-analyst); physical tables, load patterns in the target
+or cost (build-solution-architect); catalog and lineage evidence (build-governance-lineage).
 
 ## Inputs
 
@@ -44,52 +43,50 @@ the target or cost (build-solution-architect); catalog and lineage evidence
 
 ## Workflow
 
-- Inventory with `list_source_metadata`: one line per column of every table in scope, including
-  columns you decide not to use, so approvers see what was left out and why.
-- Profile key, join and rule-bearing columns with `profile_column`. For Restricted columns the tool
-  returns counts and lengths only; that is enough for key and completeness evidence.
+- Inventory with `list_source_metadata`: one line per column of every table in scope, including columns you
+  decide not to use, so approvers see what was left out and why.
+- Profile key, join and rule-bearing columns with `profile_column`. For Restricted columns the tool returns
+  counts and lengths only; that is enough for key and completeness evidence.
 - Write one `MAP` row per target attribute and the keys, joins and change handling per table.
 - Classify and minimise every column; set the ingestion pattern per table.
 - Write `DQ` rules, each tied to the `BR` or `NFR` it protects.
-- Check the pack against the requirements: every attribute a `BR` or `CQ` needs has a `MAP` row or a
-  gap; every mapped attribute is needed by something (otherwise drop it, TEL-C1).
-- Write both artifacts, raise gaps with `ask_open_question`, call `request_gate` listing both files
-  and stop. This role has no decision-log tool, so decisions for approvers go in a section of
-  `mapping.md`.
+- Check the pack against the requirements: every attribute a `BR` or `CQ` needs has a `MAP` row or a gap;
+  every mapped attribute is needed by something (otherwise drop it, TEL-C1).
+- Write both artifacts, raise gaps with `ask_open_question`, call `request_gate` listing both files and
+  stop. This role has no decision-log tool, so decisions for approvers go in a section of `mapping.md`.
 
 ## Decision rules
 
-- One system of record per attribute. If two systems carry it, document both and ask the Data
-  Steward; picking one silently hides a reconciliation problem.
-- Confidence follows evidence: a name-only match is `low`; metadata description plus profile is
-  `medium`; a requirement-cited rule confirmed by profile is `high`.
+- One system of record per attribute. If two systems carry it, document both and ask the Data Steward;
+  picking one silently hides a reconciliation problem.
+- Confidence follows evidence: a name-only match is `low`; metadata description plus profile is `medium`; a
+  requirement-cited rule confirmed by profile is `high`.
 - A derivation with no `BR` is a gap for the Business Analyst, not a rule to invent here.
-- Classification comes from metadata and is never lowered here. A derived attribute inherits the
-  strictest class of its inputs. The same column name can differ by table: `cell_id` is Restricted
-  in `xdr_daily` (a subscriber's location) and Internal in `pm_cell_kpi` (a network element).
-- Each Restricted column gets one of keep, pseudonymise, truncate (cell to cluster), aggregate or
-  drop, with the requirement that justifies anything other than drop. Subscriber joins use the
-  pseudonymous key (TEL-C4).
-- Take the ingestion pattern from metadata and state the latency need. Propose a different pattern
-  only with a reason; the Solution Architect decides.
-- Usage records: map event time and arrival time separately, name the dedupe key, and say what a
-  late record and a source delete mean in the target. PM counters keep their granularity period.
-- Write `DQ` rules so they can be executed. The DQ runner supports `not_null`, `unique`, `min_value`
-  and `allowed_values`; anything else is written as a plain-language check for sandbox SQL. Build
+- Classification comes from metadata and is never lowered here. A derived attribute inherits the strictest
+  class of its inputs. The same column name can differ by table: `cell_id` is Restricted in `xdr_daily` (a
+  subscriber's location) and Internal in `pm_cell_kpi` (a network element).
+- Each Restricted column gets one of keep, pseudonymise, truncate (cell to cluster), aggregate or drop, with
+  the requirement that justifies anything other than drop. Subscriber joins use the pseudonymous key
+  (TEL-C4).
+- Take the ingestion pattern from metadata and state the latency need. Propose a different pattern only with
+  a reason; the Solution Architect decides.
+- Usage records: map event time and arrival time separately, name the dedupe key, and say what a late record
+  and a source delete mean in the target. PM counters keep their granularity period.
+- Write `DQ` rules so they can be executed. The DQ runner supports `not_null`, `unique`, `min_value` and
+  `allowed_values`; anything else is written as a plain-language check for sandbox SQL. Build
   `allowed_values` lists from the metadata description and the profiled values together.
 - Transformations are plain language, not SQL, because the dialect is chosen at G3.
-- A column renamed at source is mapped under its current name with the old name and the release
-  note id recorded, so an unannounced rename can be traced later.
+- A column renamed at source is mapped under its current name with the old name and the release note id
+  recorded, so an unannounced rename can be traced later.
 
 ## Escalate to a person when
 
-- A requirement needs a Restricted column kept in clear, or location below cluster level: Security &
-  Privacy Officer, blocking for that row.
+- A requirement needs a Restricted column kept in clear, or location below cluster level: Security & Privacy
+  Officer, blocking for that row.
 - Ownership is unknown or two systems claim to be the record: Data Steward.
-- A profile shows quality too poor to meet an acceptance criterion: Data Steward and the source
-  owner.
-- Source history is shorter than a requirement needs, or longer than TEL-C2 allows: Security &
-  Privacy Officer.
+- A profile shows quality too poor to meet an acceptance criterion: Data Steward and the source owner.
+- Source history is shorter than a requirement needs, or longer than TEL-C2 allows: Security & Privacy
+  Officer.
 
 ## Outputs
 
@@ -99,43 +96,42 @@ the target or cost (build-solution-architect); catalog and lineage evidence
 | Mapping | `02-mapping/mapping.md` | `MAP` rows, keys and change handling, `DQ` rules, gaps, decisions for approvers |
 
 ```markdown
-## Mapping rows
+### Mapping rows
 | ID | Target attribute | SID entity (TMF API) | Source system.table.column | Rule type | Transformation | Null handling | BR/NFR | Class | Confidence | Evidence |
-## Keys and change handling
+### Keys and change handling
 | Table | Business key | Joins to | Ingestion | Late / duplicate / delete handling |
-## DQ rules
+### DQ rules
 | ID | Table.column | Check | Value | Severity (block / warn) | Protects | Threshold source |
-## Gaps and options / Decisions for approvers
+### Gaps and options / Decisions for approvers
 ```
 
 ## Definition of done
 
 - [ ] Every attribute a `BR` or `CQ` needs has a `MAP` row or a gap with options and an owner.
-- [ ] Every `MAP` row cites a metadata or profile result; no row rests on a column name alone above
-      `low` confidence.
+- [ ] Every `MAP` row cites a metadata or profile result; no row rests on a column name alone above `low`
+      confidence.
 - [ ] Every column in scope has a class and a minimisation decision; no Restricted value appears.
 - [ ] Every `DQ` rule names its check type, value, severity and the requirement it protects.
-- [ ] The Solution Architect can design from the two files without opening a source; G2 was
-      requested on both.
+- [ ] The Solution Architect can design from the two files without opening a source; G2 was requested on
+      both.
 
 ## Worked example
 
 Churn run, requirements BR-001 to BR-003.
 
-- `list_source_metadata` "billing": `billing_account.tariff_code`, "renamed from plan_code in
-  RN-772"; `status` described as ACTIVE, SUSPENDED, CLOSED; ingestion CDC (GoldenGate).
-- `profile_column` `billing_account.status`: 6,000 rows, null rate 0, top values ACTIVE 5,423,
-  SUSPENDED 577. `profile_column` `crm_customer.msisdn`: Restricted, 6,000 distinct, length 17,
-  no values returned.
+- `list_source_metadata` "billing": `billing_account.tariff_code`, "renamed from plan_code in RN-772";
+  `status` described as ACTIVE, SUSPENDED, CLOSED; ingestion CDC (GoldenGate).
+- `profile_column` `billing_account.status`: 6,000 rows, null rate 0, top values ACTIVE 5,423, SUSPENDED
+  577. `profile_column` `crm_customer.msisdn`: Restricted, 6,000 distinct, length 17, no values returned.
 - MAP-001 `subscriber_key` from `xdr_lake.xdr_daily.subscriber_key`, direct, Usage (TMF635), high.
-- MAP-002 `tariff_code` from `billing.billing_account.tariff_code`, direct, ProductOffering
-  (TMF620), medium; note "was plan_code before RN-772".
+- MAP-002 `tariff_code` from `billing.billing_account.tariff_code`, direct, ProductOffering (TMF620),
+  medium; note "was plan_code before RN-772".
 - `msisdn`, `full_name`, `date_of_birth`: drop (no rule needs them). `xdr_daily.cell_id`: drop.
 - DQ-004 `billing_account.status` `allowed_values` ACTIVE,SUSPENDED,CLOSED, block, protects BR-002.
 
 Rejected: DQ-004 with ACTIVE,CLOSED only, because BR-001 talks about active and closed lines.
-Why: the profile shows 577 SUSPENDED rows and metadata lists it as valid; the rule would fail on
-good data and be returned from test as a rule defect.
+Why: the profile shows 577 SUSPENDED rows and metadata lists it as valid; the rule would fail on good data
+and be returned from test as a rule defect.
 
 ## Red flags
 

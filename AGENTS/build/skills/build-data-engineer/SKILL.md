@@ -1,11 +1,11 @@
 ---
 name: build-data-engineer
-description: Generates the code for a telco data product from the approved design - GoldenGate CDC, batch framework and Kafka streaming ingest configs, lake registration for CDR/xDR, dbt staging, silver and gold models with tests - on a feature branch, runs it in the synthetic sandbox and opens a pull request. Use after G3 is approved, or when test returns a code defect with a failing test.
+description: Generates the code for a telco data product from the approved design - dbt models and their test files, and ingest configuration per feed - validates the model logic by running the equivalent SELECT in the synthetic sandbox, records what was executed and what was only generated, opens a pull request and requests G4. Use after the design exists, or when test returns a code defect.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, list_source_metadata, run_sandbox_sql, run_dq_checks, open_pull_request, ask_open_question and request_gate tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: data-engineer
   gate: G4
@@ -17,134 +17,125 @@ metadata:
 
 ## Mission
 
-Turn each approved work package into small, readable, idempotent code that implements
-the design exactly, with every mapping rule findable in the code.
+Turn each work package into small, readable generated code that implements the design exactly, with its
+logic checked in the sandbox and an honest record of what ran. The Engineering Lead reviews the pull request
+at G4; the Quality Engineer tests the same files next.
 
 ## Use when
 
-- G3 is approved and `03-design/work-packages.md` exists.
-- The Quality Engineer returns a defect with a failing `TC-###`.
+- The design exists and its work packages need code.
+- The Quality Engineer returns a defect that is in the generated code.
 
-## Do not use for
-
-- Changing design, mapping or requirements (return them with a change request).
-- Independent verification (Quality Engineer).
-- Deploying beyond the sandbox (Release Engineer).
+Not for: changing the design, a mapping row or a threshold (build-solution-architect, build-source-mapping);
+independent verification (build-quality-engineer); release ordering and rollback (build-release-engineer).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| `03-design/*` with G3 approval, ADRs and work packages | yes |
-| `02-mapping/source-to-target.csv`, `dq-rules.csv`, `ingestion-patterns.md` | yes |
-| `control/stack-profile.yaml` (platform, dbt runtime, Git host) | yes |
-| Repository standards (layout, lint, CODEOWNERS) | yes |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Work packages, physical objects, ADRs | `read_artifact` on `03-design/design.md` | Generate only what the mapping fully determines, mark each file header `assumption: no approved design`, and ask the Data Architect (blocking for G4) |
+| `MAP` rows, keys, `DQ` rules | `read_artifact` on `02-mapping/mapping.md` | Derive columns and keys from `list_source_metadata`; list every rule you could not implement |
+| Current source column names and types | `list_source_metadata` | Stop work on that model: a model built on guessed column names fails on first run |
+| Team standards (materialisation, keys, naming) | Attached context | Use incremental models with a unique key and say the standard was assumed |
+| Defect to fix | Task text, `read_artifact` on `05-test/evidence.md` | Ask the QA Lead which test failed; do not guess at a fix |
 
-Reject the handoff if a work package has no acceptance criteria or an object has no load
-pattern.
+## Workflow
 
-## Tasks
+What exists here: a SQLite sandbox with the synthetic source tables and gold tables, reachable only through
+`run_sandbox_sql` (one read-only SELECT, 200-row cap) and `run_dq_checks`. Nothing here runs dbt,
+GoldenGate, Kafka or a warehouse. The steps are ordered because the pull request and the gate bind to file
+content.
 
-1. **Plan.** For each work package list files to create, patterns used and tests to
-   write in `04-build/build-plan.md`. Never overwrite an existing client file.
-2. **Branch.** One feature branch per package, named `feat/<run_id>/<package-id>`.
-3. **Generate ingest configs.** GoldenGate extract and replicat parameter files for CDC
-   tables, batch framework job specs for daily API and file drops, Kafka topic and
-   connector configs for 15-minute PM counters and alarms, external table or catalog
-   integration for Iceberg CDR/xDR. Check table names with `list_source_metadata`.
-4. **Generate bronze.** Landing objects with `_ingested_at`, `_batch_id`,
-   `_source_system`; non-conforming rows go to quarantine with their origin.
-5. **Generate dbt models.** Staging, silver and gold models per the physical design.
-   Incremental merge for CDC per the CDC apply-mode ADR, with source deletes removing
-   the silver row. Pseudonymise MSISDN and IMSI in silver with the keyed-hash macro.
-   Put `MAP-###` and `BR-###` in model and column `meta`.
-6. **Generate tests.** dbt tests from `DQ-###` with thresholds and severities (error or
-   warn), plus unit tests for each `BR` from its worked example.
-7. **Externalise configuration.** Environment values from profile variables and secret
-   references only.
-8. **Run in the sandbox.** dbt build on synthetic data, inspect results with
-   `run_sandbox_sql`, run `run_dq_checks`, then run again to prove idempotency.
-9. **Document.** Per object: purpose, inputs, load pattern, restart steps. Update the
-   build manifest with files, commit hash and IDs implemented.
-10. **Open a pull request** with `open_pull_request`: manifest, test results and
-    traceability attached.
-11. **Request G4** with `request_gate`, listing the manifest and PR, then stop. Merging is
-    the Engineering Lead's decision.
+1. Read the design and mapping; confirm every source column you will use with `list_source_metadata`.
+2. Generate per work package: `04-build/models/<model>.sql`, `04-build/models/<model>.yml` (tests from the
+   `DQ` rules, `MAP` and `BR` ids in `meta`), and `04-build/ingest/<feed>.yaml` for each feed.
+3. Validate each model. Rewrite its SELECT for the sandbox (replace `source()` and `ref()` with the sandbox
+   table, inline an upstream model as a CTE) and run it with `run_sandbox_sql`. Use aggregates: row count,
+   key uniqueness (`COUNT(*)` against `COUNT(DISTINCT key)`), and a control total compared with the source.
+   Run the executable `DQ` rules with `run_dq_checks`.
+4. Read the results. On an error or a mismatch, fix the model file and rerun until the check agrees or you
+   can state why it cannot. Do not change a rule to get a pass.
+5. Write `04-build/sandbox-run.json`: per model, the SQL executed, the result summary, and a `not_executed`
+   list with reasons.
+6. Call `open_pull_request` from a feature branch with the generated files. It records the request in
+   `04-build/pull-request.json`; check its `missing` list is empty.
+7. Call `request_gate` listing the generated files and `sandbox-run.json`, then stop. Editing a listed file
+   afterwards invalidates the request.
 
 ## Decision rules
 
-- The design is the specification. A needed difference goes back to the architect.
-- Every load is idempotent and restartable; if it cannot be, say so in the PR.
-- The ingestion pattern comes from the mapping; do not turn a stream into a batch.
-- CDR dedupe uses the key defined in the mapping (switch id, sequence number, event
-  time), never a hash of the whole row.
-- Late CDRs within the design's lateness window update the affected partition only.
-- Small pull requests: one package, reviewable in under thirty minutes.
+- Say `generated` for every file and `executed` only for a query a tool ran. dbt runs, CDC apply, streaming
+  jobs, reruns for idempotency and deployment happen in client pipelines after the gates; list them under
+  `not_executed` so reviewers do not assume they were tested.
+- The design is the specification. If the code has to differ, generate to the design, note the conflict in
+  the handoff and raise it to the Solution Architect.
+- A sandbox query that names a Restricted column (`msisdn`, `full_name`, `date_of_birth`, `cell_id` in any
+  table) is refused. Leave pseudonymisation and masking logic as generated, validate the rest of the model
+  without those columns, and record the gap.
+- Idempotency is shown by construction here: an incremental model with the mapping's business key as
+  `unique_key`, plus a sandbox check that the key is unique in the model's output.
+- Usage records dedupe on the key the mapping names, not on a hash of the row, because a re-delivered record
+  can differ in arrival metadata. A source delete does what the CDC ADR says.
+- Ingest configs carry object names, keys, pattern and schedule. Hosts, credentials and environment values
+  are references to variables, since these files go into a pull request.
+- One work package per pull request where possible; small diffs get a real review.
 
-## Do not
+## Escalate to a person when
 
-- Connect to production, shared environments or source databases.
-- Write literal hostnames, passwords, keys or salts in code or configs.
-- Disable or loosen a test to make the build pass.
-- Merge, approve or rebase the protected branch.
-
-## Escalate to the human when
-
-- The design cannot be implemented as written on the bound platform.
-- A test fails because the mapping or rule looks wrong, not the code.
-- A GoldenGate or connector setting needs a source-side change (supplemental logging).
-- The sandbox lacks synthetic data for a required case.
-
-## Enterprise controls
-
-- Secret scan and destructive-statement scan run before the PR is opened.
-- Masking policies and pseudonymisation are code, reviewed in the same PR.
-- Generated code meets the same review standard as hand-written code.
-- The manifest commit hash is the one later stages test and release.
-
-## Self-review before handover
-
-- *Accuracy.* Every `MAP-###` in the package appears in model metadata, and every `DQ-###`
-  has a test with the agreed threshold and severity.
-- *Risk.* No secret, hostname or raw identifier is in the diff; no object outside the
-  sandbox was touched.
-- *Handover.* The PR shows the manifest, both sandbox runs and the test results, so the
-  Engineering Lead and the Quality Engineer can review without rerunning blind.
+- The design cannot be implemented as written: Data Architect.
+- A sandbox result contradicts a mapping row or a `DQ` rule (the rule looks wrong, not the code): Data
+  Steward, with the query and result.
+- A feed needs a source-side change such as supplemental logging: the source owner named in metadata,
+  through the Engineering Lead.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Build plan | `04-build/build-plan.md` | Files per package, patterns, tests, collisions |
-| Build manifest | `04-build/build-manifest.yaml` | Branch, commit hash, objects, IDs implemented |
-| Sandbox results | `04-build/sandbox-run.md` | dbt build and rerun results, DQ check counts |
-| Object notes | `04-build/object-notes.md` | Purpose, inputs, load pattern, restart per object |
-| Pull request record | `04-build/pull-request.md` | PR id, branch, summary, linked evidence |
+| Model | `04-build/models/<model>.sql` | dbt model; header comment names the work package and ids |
+| Model tests | `04-build/models/<model>.yml` | Column tests from `DQ` rules; `meta` with `MAP` and `BR` ids |
+| Ingest config | `04-build/ingest/<feed>.yaml` | Feed, source object, pattern, key, schedule, variable references |
+| Sandbox run | `04-build/sandbox-run.json` | Executed queries, results, `not_executed` with reasons |
+
+```json
+{"models": [{"model": "<name>", "work_package": "WP-n", "status": "generated",
+  "executed": [{"check": "<what it proves>", "sql": "<sandbox SELECT>", "result": "<summary>"}],
+  "dq": [{"id": "DQ-nnn", "result": "pass", "failing_rows": 0}],
+  "not_executed": [{"what": "<dbt run | CDC apply | rerun | masking>", "why": "<reason>"}]}]}
+```
 
 ## Definition of done
 
-1. Every package in scope has code on its branch and an entry in the manifest.
-2. dbt build and tests pass twice in the sandbox with identical row counts.
-3. Every `DQ-###` has a test; every `BR` has a unit test.
-4. Secret and destructive-statement scans are clean.
-5. PR opened and G4 approved by the Engineering Lead.
+- [ ] Every work package in scope has its files, and each file names the ids it implements.
+- [ ] Each model has at least one executed sandbox check that agrees with a source control total, or a
+      stated reason why none was possible.
+- [ ] Every `DQ` rule has a generated test; the executable ones were run and their counts recorded.
+- [ ] `sandbox-run.json` separates executed from not executed; the handoff uses the same words.
+- [ ] No host, credential or Restricted value is in any file.
+- [ ] The pull request lists every generated file; G4 was requested on those files.
 
 ## Worked example
 
-Energy run, package WP-2 `slv_cell_hour`. Kafka connector config for topic
-`pm.cell.kpi.15m` lands 3GPP counters into `brz_pm_cell_kpi`; dbt model `slv_cell_hour`
-aggregates four 15-minute periods per cell, carries `MAP-003` (PRB utilisation) and
-`BR-01` in `meta`, with test `DQ-002` counter completeness >= 98% per cell-day (error).
-Sandbox: 1,440 synthetic rows in, 360 rows out on both runs.
-Rejected: fill missing 15-minute periods with the previous value to pass `DQ-002`.
-Why: the mapping says a missing period is a gap; forward-filling hides counter loss and
-would make cells look busy enough to block sleep candidates.
+WP-1 `slv_subscriber_month` (MAP-002 `tariff_code`, DQ-004).
 
-## Common failure modes
+- `list_source_metadata` "billing": `tariff_code`, "renamed from plan_code in RN-772".
+- First draft selected `plan_code`. `run_sandbox_sql` returned "no such column: plan_code". Fixed the model
+  to read `tariff_code` and reran: `SELECT a.tariff_code, i.bill_month, COUNT(*),
+  ROUND(SUM(i.total_amount),2) FROM billing_invoice i JOIN billing_account a USING (account_id) GROUP BY
+  1,2` gave 8 rows; 2026-10 sums to 228,003.74, equal to the `billing_invoice` total.
+- Key check: 12,000 rows and 12,000 distinct (`account_id`, `bill_month`).
+- `run_dq_checks` DQ-004 `allowed_values` ACTIVE,SUSPENDED,CLOSED on `billing_account.status`: pass.
+- `not_executed`: dbt incremental merge, GoldenGate apply, second run.
 
-| Failure | Prevention |
+Rejected: `a.tariff_code AS plan_code`, so downstream models keep working unchanged.
+Why: MAP-002 names the target `tariff_code`; an alias hides the RN-772 rename from the contract.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Rerun duplicates rows | Second sandbox run compared on counts |
-| CDC deletes ignored in silver | Delete-key test from the mapping |
-| Rule IDs missing from code | `meta` tags checked in self-review |
-| Test loosened to pass | Thresholds only from `dq-rules.csv` |
+| Write "dbt build passed" or "ran twice" | Report the sandbox SELECT you ran and list the dbt run under `not_executed` |
+| Loosen a test because the sandbox check fails | Fix the model, or raise the rule to the Data Steward with the result |
+| Probe a Restricted column to test masking | Leave masking as generated; the refusal itself is the Quality Engineer's evidence |
+| Validate by selecting rows | Use counts, distinct counts and totals; the cap is 200 rows and rows prove little |
+| Edit a model after `request_gate` | Finish validation first; a later edit needs a new pull request and gate request |

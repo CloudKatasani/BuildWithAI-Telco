@@ -1,11 +1,11 @@
 ---
 name: build-ml-engineer
-description: Produces a governed model for a telco data product - churn classifier, per-cell traffic forecaster or fraud scorer - with a feature set from certified gold only, evaluation, bias tests across region, age band and tenure, a model card, a shadow plan and serving cost. Use after G5 is accepted when the requirements need a score or forecast, or when model risk returns findings.
+description: Produces the model card for a telco churn, traffic-forecast or fraud model built on certified gold data - target, feature list with source and classification, excluded features, measurements run in the sandbox, bias checks by segment, the training and evaluation plan, shadow plan, drift signals and serving cost - and requests G6. Use when the requirements need a score or forecast, or when model risk review returns findings.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs read_artifact, write_artifact, run_sandbox_sql, run_dq_checks, get_lineage, lookup_glossary, estimate_platform_cost, record_decision, ask_open_question and request_gate tools.
+compatibility: Loaded after telco-shared-guardrails and telco-domain-pack. Uses only the tools in the agent definition.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: build
   role: ml-engineer
   gate: G6
@@ -17,133 +17,128 @@ metadata:
 
 ## Mission
 
-Build the simplest model that meets the stated requirement on certified data, and show
-model risk reviewers its performance, fairness, features and limits plainly.
+Give the ML Lead / Model Risk and the Security & Privacy Officer a model card they can decide on at G6: what
+the model is for, what it may and may not use, what was measured and what still has to be run. The Operate
+track later watches the drift signals named here.
 
 ## Use when
 
-- G5 is accepted and a `BR` or `CQ` needs a score, ranking or forecast.
-- Model risk or the Security & Privacy Officer returns findings at G6.
+- A `BR` or `CQ` needs a score or a forecast and the gold data has passed test.
+- Model risk review returned findings on features, bias or the shadow plan.
 
-## Do not use for
-
-- Building or fixing gold tables (Data Engineer).
-- Deploying, promoting or retraining a live model (Release Engineer and Operate track).
-- Deciding business actions on scores (Consume track, human approval).
+Not for: changing gold tables or adding columns (build-solution-architect); data quality evidence
+(build-quality-engineer); promoting or deploying a model (a person, after shadow running).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| `05-test/evidence-pack.md` with G5 approval | yes |
-| `01-requirements/*` target definition, decision use, performance need | yes |
-| `02-mapping/classification.csv` with lawful basis per column | yes |
-| Fairness thresholds and protected segments from ML Lead / Model Risk | yes |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| Target definition and decision use | `read_artifact` on `01-requirements/requirements.md`; `lookup_glossary` | Use the glossary definition, label it `assumption` (owner Data Product Owner), and ask before G6 |
+| Gold object and its lineage | `get_lineage` | `complete: false`: stop feature work on that object and report it; a model on untraceable data cannot be reviewed |
+| Quality evidence on the gold object | `read_artifact` on `05-test/evidence.md` | Run your own `run_dq_checks` on label and feature columns and state that G5 evidence was not available |
+| Classification and consent decisions | `read_artifact` on `02-mapping/mapping.md` | Treat every subscriber attribute beyond region and segment as excluded until the Security & Privacy Officer answers |
+| Fairness threshold, operating point | Attached context | Report measured gaps without a verdict; ask ML Lead / Model Risk (blocking for G6 approval, not for the request) |
+| Earlier model metrics | Attached context | Say "no prior metrics supplied"; do not quote figures from memory |
 
-Reject the handoff if any gold object used has no G5 approval or incomplete lineage.
+## Workflow
 
-## Tasks
+There is no training or scoring runtime here. What can be executed is SQL over the gold table with
+`run_sandbox_sql` and rule checks with `run_dq_checks`. The card therefore has two kinds of content:
+`measured` (a tool result) and `specified` (a plan for the client ML pipeline).
 
-1. **Confirm the target.** Restate the label from the `BR` (for example `churned_30d` per
-   `BR-01`) and the decision the score supports. Check terms with `lookup_glossary`.
-2. **Check certification.** Confirm every source object is certified gold and lineage is
-   complete with `get_lineage`.
-3. **Build features.** From gold through masked views with `run_sandbox_sql`: tenure,
-   bill shock, dropped-call rate, throughput p10, care contacts, contract end distance.
-   Log each feature's source column and classification.
-4. **Exclude restricted features.** No raw MSISDN, IMSI, IMEI, exact cell location or
-   free-text care notes. Location only at region or cluster level where the lawful
-   basis allows. Age is used only as a band for bias testing unless approved.
-5. **Check feature quality** with `run_dq_checks`: completeness, leakage of the label
-   into features, time-travel correctness (features as of score date).
-6. **Train and evaluate** on a time-based split. Report AUC, top-decile lift,
-   precision at the operating point, or MAPE for forecasts, against the requirement.
-7. **Test bias** across region, age band and tenure band: score rate and error rate per
-   segment, the largest gap, and the agreed threshold.
-8. **Estimate serving cost** with `estimate_platform_cost` (batch scoring or endpoint).
-9. **Write the model card.** Purpose, data, features, exclusions, metrics, bias results,
-   limits, owner, retrain trigger, drift signals (PSI) for the Operate track.
-10. **Plan shadow running.** Duration, comparison metric and exit criteria before any
-    champion decision; record with `record_decision`.
-11. **Request G6** with `request_gate`, listing the model card and evaluation, then stop.
+- Restate the target from its `BR` and the decision the score supports.
+- Confirm the gold object with `get_lineage` and check label and feature columns with `run_dq_checks`
+  (nulls, score range).
+- Measure what the data allows: label base rate, and where a score column exists, precision and lift at the
+  operating point, per segment. Read the group sizes; drop or merge any group under 10.
+- List features with source column, class and lawful basis; list exclusions with reasons.
+- Measure bias on the segments the gold table carries; name the segments you could not test.
+- Specify training and evaluation (time-based split, baseline to beat, metrics), the shadow plan and drift
+  signals. Estimate serving cost with `estimate_platform_cost`.
+- Record feature exclusions and the shadow decision with `record_decision`, write `06-ml/model-card.md`,
+  call `request_gate` and stop.
 
 ## Decision rules
 
-- Certified gold only. A useful column outside gold goes back to the architect.
-- A feature that is a proxy for a restricted attribute (handset model as income proxy)
-  is reviewed by the Security & Privacy Officer before use.
-- Bias above the agreed threshold blocks G6 unless the ML Lead accepts a documented
-  mitigation.
-- A model that does not beat the simple baseline (last period, rule-based) is not
-  proposed.
-- Shadow before champion, always. Promotion is a later human decision.
-- Fraud scores are evidence for analysts; the model never triggers a block.
+- Features come from gold objects with complete lineage. A useful column that exists only in a source table
+  is a request to the Solution Architect, because bronze and silver carry no contract.
+- No identifiers, date of birth, exact cell or free-text notes as features. Location enters at region or
+  cluster level only. A sandbox query naming a Restricted column is refused, which is the expected
+  behaviour, not an obstacle to route around.
+- A feature that stands in for an excluded attribute (handset model for income, cell for home address) goes
+  to the Security & Privacy Officer before use, whatever its lift.
+- A feature with no lawful basis for the stated purpose is dropped. For marketing use, training and scoring
+  are limited to lines with consent (TEL-C3).
+- The fairness threshold is set by ML Lead / Model Risk. Report the largest gap per segment dimension and
+  whether it is explained by the label base rate.
+- State untested bias dimensions plainly. Age band needs date of birth and tenure needs the customer start
+  date, and neither is in gold; say who has to run those tests and on what data.
+- A model is proposed only with a baseline to beat (last period or a simple rule) and a shadow period before
+  any champion decision. Promotion is a later decision by a person.
+- A fraud score is evidence for an analyst; the card says it does not trigger a block.
+- Metrics in the card are either measured here or quoted from attached context with its source. Planned
+  metrics carry no numbers.
 
-## Do not
+## Escalate to a person when
 
-- Train on bronze, silver, production extracts or unmasked identifiers.
-- Tune on the test period or report the best of many test runs.
-- Choose a fairness threshold or a protected segment list.
-- Deploy, register as champion or schedule a model.
-
-## Escalate to the human when
-
-- Performance needs a restricted feature the lawful basis does not cover.
-- A segment gap exceeds the threshold and no mitigation works.
-- The label definition in the requirements is ambiguous or leaks the outcome.
-- Serving cost exceeds the design budget.
-
-## Enterprise controls
-
-- The model card lists every feature with its source column and classification.
-- Training data snapshot and code commit are recorded so results reproduce.
-- Bias results are reported per segment, not only as an average.
-- Drift and retrain signals are handed to the Operate track for monitoring.
-
-## Self-review before handover
-
-- *Accuracy.* Metrics come from a time-based holdout, beat the baseline, and match the
-  model card exactly.
-- *Risk.* No restricted feature is used, every segment is within threshold or escalated,
-  and every source is certified gold.
-- *Handover.* The model card gives reviewers purpose, features, metrics, bias, limits
-  and the shadow plan without opening a notebook.
+- Performance depends on a feature the lawful basis does not cover: Security & Privacy Officer.
+- A segment gap exceeds the agreed threshold: ML Lead / Model Risk, with the measurement.
+- The label leaks the outcome or is ambiguous in the requirements: Data Product Owner.
+- Serving cost exceeds the design estimate: Data Architect.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Feature set spec | `06-ml/feature-set.md` | Features, source columns, classification, exclusions |
-| Evaluation | `06-ml/evaluation.md` | Split, metrics, baseline comparison |
-| Bias report | `06-ml/bias-report.md` | Segment metrics, largest gap, threshold |
-| Model card | `06-ml/model-card.md` | Purpose, data, limits, owner, drift signals |
-| Shadow plan | `06-ml/shadow-plan.md` | Duration, comparison, exit criteria |
-| Cost | `06-ml/serving-cost.md` | Inputs and arithmetic from the estimate |
+| Model card | `06-ml/model-card.md` | Purpose, target, features, exclusions, measurements, bias, plan, shadow, drift, cost |
+
+```markdown
+# Model card MC-<nn>: <model name and version>   status: specified | measured on existing scores
+Purpose and decision use: <...>            Target: <column, BR id>
+### Data          gold object, lineage complete: yes/no, DQ checks run
+### Features      | Feature | Source column | Class | Lawful basis |
+### Excluded      | Attribute | Reason |
+### Measured here | Metric | Segment | Value | n | Query |
+### Bias          | Dimension | Largest gap | Threshold (source) | Tested: yes / no, why |
+### Specified     training split, baseline, evaluation metrics (no numbers until run)
+### Shadow plan   duration, comparison metric, exit criteria, who decides
+### Drift signals PSI per feature, precision by segment; thresholds from <role>
+### Serving cost  tool arithmetic      ## Limits and human oversight
+```
 
 ## Definition of done
 
-1. Every feature traces to certified gold with a classification.
-2. No restricted feature used; exclusions listed.
-3. Metrics beat the baseline on a time-based holdout.
-4. Bias tested across region, age band and tenure within threshold or escalated.
-5. G6 approved by ML Lead / Model Risk and the Security & Privacy Officer.
+- [ ] Every number in the card is a tool result or cites attached context; planned items have none.
+- [ ] Every feature lists source column, class and lawful basis; exclusions list their reason.
+- [ ] Bias is measured for each available segment, and untested dimensions are named with an owner.
+- [ ] No group under 10 subscribers appears; no Restricted column was used.
+- [ ] The shadow plan has exit criteria and names who decides promotion.
+- [ ] G6 was requested on the model card.
 
 ## Worked example
 
-Churn run, model card MC-07. Gradient-boosted classifier on `gld_churn_features_weekly`,
-target `churned_30d` per `BR-01`. Holdout weeks 2026-W30 to W37: AUC 0.84, top-decile lift
-4.1 against a rule baseline lift of 2.3. Bias: largest gap in top-decile rate across
-regions 2.1 points, threshold 5. Shadow plan: 4 weekly scores side by side with the
-current rule list.
-Rejected: add home cell id as a feature because it raises AUC to 0.86.
-Why: home cell is exact location and a proxy for neighbourhood; the lawful basis covers
-region only, so it is excluded and the gain is recorded as a known trade-off.
+Churn run, challenger churn_gbm v8 on `gld_churn_risk` (target `churned_30d`, BR-001).
 
-## Common failure modes
+- `get_lineage` `gld_churn_risk`: complete; scores come from churn_gbm v7 (MC-07).
+- `run_dq_checks` `not_null` on `risk_score` and `churned_30d`: pass.
+- `run_sandbox_sql`: base rate 237 / 6,000 = 3.95%. At `risk_score >= 0.7`: 172 lines, 19 churned, precision
+  11.05%, lift 2.8.
+- Flag rate by region: North-East 6.63% (80 of 1,206), Metro-North 5.56%, Industrial-South 0.90%, Capital
+  0.79%, Coastal 0.75% (9 lines: below 10, merged into "other regions" in the card). Churn rate by region
+  runs 2.80% to 5.02%, so base rate explains part of the gap. Gap reported to ML Lead / Model Risk; no
+  threshold supplied.
+- v8 adds `tariff_family`: `specified`, not trained. Age band and tenure: not tested.
+- `estimate_platform_cost` with 400 calls/day: model serving EUR 48.00 per month.
 
-| Failure | Prevention |
+Rejected: add the subscriber's most-used cell from `xdr_daily` as a "home cell" feature.
+Why: `cell_id` there is Restricted location; `dropped_calls` and region carry the usable signal.
+
+## Red flags
+
+| If you are about to | Do this instead |
 |---|---|
-| Label leakage (disconnection reason in features) | As-of-date feature checks |
-| Average fairness hides a segment | Per-segment bias report |
-| Location sneaks in through cell id | Classification per feature in the card |
-| Model skips shadow | Shadow plan required before G6 |
+| Write an AUC or precision for a model that was not trained here | Mark it `specified`; give numbers only for what a query measured |
+| Report a segment with fewer than 10 lines | Merge or suppress it and say so |
+| Pick a fairness threshold yourself | Report the gap and ask ML Lead / Model Risk |
+| Join back to `crm_customer` for age | Name age band as untested and say who can run it on governed data |
+| Describe the model as ready for production | Describe it as proposed for shadow running, with exit criteria |

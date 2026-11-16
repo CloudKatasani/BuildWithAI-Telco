@@ -1,11 +1,11 @@
 ---
 name: consume-next-best-action
-description: Converts an insight into ACT-### business action proposals with expected value and its arithmetic, audience size, consent check, holdout group, discount band and named approvers, and submits each through propose_business_action. Use when an insight card or certified answer points to something the business could do - a retention offer, a care credit, a re-bill, a network pilot or proactive enterprise tickets.
+description: Turns an insight or a business request into action proposals (ACT ids) with the audience from certified metrics, expected-value arithmetic, consent check, holdout and discount band from attached policy, and creates one approval request per action routed by action type. Use when a finding points to something the business could do - a retention offer, a care credit, a re-bill, a network change or proactive enterprise tickets. It proposes; people decide and execute.
 license: Proprietary
-compatibility: Load telco-shared-guardrails and telco-domain-pack first. Needs list_metrics, query_metric, get_lineage, lookup_glossary, propose_business_action, record_decision and ask_open_question.
+compatibility: Load telco-shared-guardrails and telco-domain-pack first. Uses list_metrics, query_metric, get_lineage, lookup_glossary, read_artifact, write_artifact, propose_business_action, record_decision and ask_open_question.
 metadata:
   owner: datacrew-telco
-  version: "1.0.0"
+  version: "2.0.0"
   track: consume
   role: action-proposer
   gate: none
@@ -17,134 +17,109 @@ metadata:
 
 ## Mission
 
-Turn insight into decisions people can make quickly: a few clear proposals, each with
-its value worked out in the open, its audience checked for consent, a way to measure the
-effect, and the right approvers named.
+Put a small number of decidable proposals in front of the right approvers: what to do, for which segment, what
+it is worth with the arithmetic open, and how the effect will be measured. Approvers rely on the proposal alone.
 
 ## Use when
 
-- An insight card (Insight Scout) or answer card (Ask-Your-Data) has High or Medium
-  confidence and points to a lever the business controls.
-- A leader asks "what should we do about this?".
-- A previous ACT-### was rejected and needs a revised proposal.
+- An insight card at `high` or `medium` confidence, or a leader's request, points to a lever the business
+  controls, or a rejected proposal needs its reported points fixed.
 
-## Do not use for
-
-- Explaining why a metric moved (Insight Scout).
-- Executing or scheduling a campaign, credit, re-bill or network change (people and the
-  owning systems do that after approval).
-- Incident response on the network (Operate track).
+Not for: explaining why a metric moved (Insight Scout); one customer's case or customer wording (Care Copilot,
+Enterprise Account); incident response or executing a network change (Operate Resolution).
 
 ## Inputs
 
-| Input | Required |
-|---|---|
-| Insight or answer card with confidence High or Medium | yes |
-| Certified metrics for audience, ARPU, propensity and consent flags | yes |
-| Approved offer catalogue, discount bands, message templates | yes |
-| Uplift or take-up rates from past campaigns (certified metric) | yes |
-| Operate change calendar and freeze windows, for network actions | no |
+| Input | Where it comes from | If it is missing |
+|---|---|---|
+| The finding to act on | Task text; `consume/insights/weekly.md` via `read_artifact` | Verify the claim yourself with `query_metric` and state "no insight card; checked in this run" with what the data does and does not support |
+| Audience size and value | `query_metric` on `churn_at_risk_lines`, `at_risk_arpu`, `leakage_eur`, `sla_credit_exposure_eur`, `sleep_candidate_cells`, `idle_night_kwh` | If the group is suppressed (<10), widen the segment or do not propose; a group that small is not a campaign audience |
+| Offer policy: discount band, holdout, offer length | Attached context | Holdout: 10%, labelled `assumption`. Band or offer terms: write the proposal with terms open, ask the Campaign Manager (blocking), and do not create the approval request |
+| Marketing consent | Not a dimension of any certified metric | Size the audience before consent, call it an upper bound, add the consent filter as a check, ask the Data Steward (non-blocking) for the consented count |
+| Save rate, take-up, cost per action | Attached context only | Use an illustrative rate labelled `assumption` with a named owner, and show the break-even rate so the decision does not rest on it |
 
-## Tasks
+## Workflow
 
-1. **Check the insight** with `read_artifact`: confidence High or Medium, drivers stated,
-   freshness within service level. Low confidence stops here.
-2. **Choose the action type** and its approvers (see Decision rules). One action per ACT-###.
-3. **Size the audience** with `query_metric`: eligible lines or accounts, then remove
-   lines without marketing consent, opted-out lines, lines in an open complaint or
-   collections, and lines contacted in the last 30 days. Report each step's count.
-4. **Set the holdout**: keep a random 10% of the eligible audience untreated (5% minimum
-   for care credits); state its size.
-5. **Work out expected value** from certified rates only: audience x uplift x value per
-   unit, minus offer cost. Show every input with its metric name, and label it an estimate.
-6. **Check the offer** against the approved discount band and template; network actions
-   against change windows and the safety rules in the certified metric definitions.
-7. **Write the proposal** to `consume/actions/ACT-###.md` with `write_artifact`.
-8. **Submit** with `propose_business_action`, listing approvers and checks; record the
-   rationale and rejected options with `record_decision`; then stop.
+1. Confirm the finding. A `low` card, or a claim the data does not support, stops here with the evidence needed.
+2. Choose one action type per proposal and define the audience as a filter on certified dimensions. Size it
+   and its value with `query_metric`; confirm each filter appears in the returned SQL as `<dimension> = ?`,
+   because a filter on a key that is not an allowed dimension is dropped without notice.
+3. Work out expected value, holdout and checks; write `consume/actions/proposal.md` with `write_artifact`; log
+   the options considered with `record_decision`.
+4. Create the approval request with `propose_business_action`, one call per action. Approvers see the call's
+   fields (`title`, `audience`, `expected_value`, `checks`), so each must stand alone.
+5. Add the returned approval id to the file, hand off as `needs-approval` and stop: the tool executes nothing.
 
 ## Decision rules
 
-- Retention offer: Campaign Manager and Security & Privacy Officer.
-- Proactive care credit or SMS: Customer Care Lead and Security & Privacy Officer.
-- Re-bill or revenue recovery: Data Product Owner and Change Manager (CAB).
-- Network change (for example cell sleep pilot): routed to Operate as a change for the NOC
-  Shift Lead and Change Manager (CAB). Start with a pilot scope.
-- Enterprise proactive tickets or SLA review calls: Service Delivery Manager.
-- No consent flag, no contact. Unknown consent counts as no consent.
-- A discount outside the approved band is not proposed; raise it as an open question to
-  the Campaign Manager instead.
-- No holdout, no proposal, unless the action is a regulatory or contractual obligation
-  (re-bill, SLA credit), which is stated.
-- Expected value below the cost of running the action: record it, do not submit.
+- The runtime sets the approvers from `action_type`, so choosing the type is choosing who signs:
+  `retention_offer` (discount or plan offer): Campaign Manager, Security & Privacy Officer. `care_credit`
+  (goodwill credit, proactive care contact): Customer Care Lead, Security & Privacy Officer. `rebill` (leaked
+  revenue): Data Product Owner, Change Manager (CAB). `network_change` (for example a cell sleep pilot): NOC
+  Shift Lead, Change Manager (CAB). `enterprise_ticket` (proactive tickets, review calls): Service Delivery Manager.
+- Expected value shows every input with its source: fact (metric), policy (attached context) or `assumption`
+  (owner). Average ARPU is the `at_risk_arpu` value divided by its `n`. For an offer: treated = audience -
+  holdout; gross = treated x save rate x average ARPU x months; cost = treated x take-up x average ARPU x
+  discount x offer months; net = gross - cost, labelled an estimate. If net is negative, record it and stop.
+  At-risk lines (score 0.7 or more) are not lines that will churn: revenue at risk is the ceiling, not the saving.
+- The discount stays inside the attached band, because that is what the Campaign Manager can sign. Offers and
+  credits keep a holdout so the effect can be measured; obligations (a re-bill, an SLA credit) have none.
+- The audience is a segment definition and a count, not a list of lines. Consent (TEL-C3) is applied at
+  selection by the campaign owner and appears in `checks`; no certified metric can confirm it.
+- A network change is a pilot on named clusters whose `checks` exclude emergency coverage cells (as
+  `sleep_candidate_cells` does by definition); Operate carries it out after approval.
 
-## Do not
+## Escalate to a person when
 
-- Put MSISDN, IMSI, IMEI, names or addresses in a proposal; audiences are defined by
-  certified segment filters.
-- Round up value or take-up rates, or use a rate that is not a certified metric.
-- Bundle several actions so one approval covers them all.
-- Mark an action as approved or scheduled.
-
-## Escalate to the human when
-
-- The audience includes vulnerable-customer or minor flags (Security & Privacy Officer).
-- Expected value depends on a rate with no certified source (metric owner, open question).
-- A network action falls inside a change freeze (Change Manager (CAB)).
-- Two proposals target the same lines in the same week (Campaign Manager).
-
-## Enterprise controls
-
-- Every ACT-### is permanent, never renumbered, and links to its insight card.
-- Approval requests carry the audience definition, not a list of lines.
-- Consent and opt-out checks are counted and shown, not asserted.
-- Measured results are compared with the holdout after the campaign window.
-
-## Self-review before handover
-
-- *Accuracy.* Every input to expected value is a certified metric, the arithmetic is shown
-  and adds up, and the audience counts reconcile step by step.
-- *Risk.* Consent, opt-out, discount band and holdout are checked; approvers match the
-  action type; nothing is executed.
-- *Handover.* Approvers can decide from the proposal alone: what, who, how many, value,
-  checks, how success is measured.
+- Two proposals would reach the same segment in the same period: Campaign Manager, blocking.
+- A network proposal may fall in a freeze window: Change Manager (CAB), blocking.
+- The audience may include vulnerable customers or minors: Security & Privacy Officer, blocking.
 
 ## Outputs
 
 | Artifact | Path | Content |
 |---|---|---|
-| Action proposal | `consume/actions/ACT-###.md` | Action, audience steps, value arithmetic, holdout, band, checks, approvers |
-| Approval request | via `propose_business_action` | ACT-### id, approvers, checks |
-| Decision log entry | via `record_decision` | Rationale and rejected options |
+| Action proposals | `consume/actions/proposal.md` | One block per ACT id in the shape below |
+
+```
+### ACT-001 <action> for <segment> (based on: <insight card or request>, confidence <high | medium>)
+Action type: <action_type>   Approvers: <from the tool result>   Approval id: <from the tool result>
+Audience: <filter on certified dimensions> = <n> lines (before consent)   Holdout: <percent> = <n>   Treated: <n>
+Offer: <terms> (band <...> from <policy source>)
+Expected value (estimate): <formula, each input labelled fact | policy | assumption> = <result>; break-even <rate>
+Checks: consent_marketing = 'Y' at selection; <exclusions>; <measurement against holdout>
+Evidence: <metric names, SQL, filter values, lineage>   Open questions: <...>
+```
 
 ## Definition of done
 
-1. Each proposal links to an insight or answer card of High or Medium confidence.
-2. Audience counts show every filter step, including consent and opt-out.
-3. Expected value shows inputs, arithmetic and the "estimate" label.
-4. Holdout size and discount band are stated.
-5. Approvers match the action type and the approval request exists.
+- [ ] Audience and value figures come from `query_metric` results of this run, filters confirmed in the SQL.
+- [ ] Every expected-value input is labelled fact, policy or assumption, and the arithmetic reproduces the result.
+- [ ] Consent check, holdout, discount band and measurement method are stated, or their absence is explained.
+- [ ] One approval request per action, with the matching `action_type`; the proposal says nothing was executed.
 
 ## Worked example
 
-Insight: Metro-North churn risk up 34%, associated with bill shock after the price rise.
+Request: "Churn risk jumped in Metro-North after the network incident. Propose a retention action for
+high-value, consented lines." Attached: offer policy (band 10-20% for 6 months, holdout 10%), team standards.
+- `query_metric(metric="churn_at_risk_lines", filters={"region": "Metro-North", "value_segment": "High"})`: one
+  group, above the suppression limit; `at_risk_arpu` with the same filters gives the monthly ARPU sum and `n`.
+  A `consent_marketing` filter would be dropped silently, so this is the audience before consent: STD-05 goes
+  into `checks` and a non-blocking question goes to the Data Steward.
+- By `top_driver` the dropped-calls group in Metro-North is suppressed (<10), so the proposal rests on the
+  concentration of risk, not on the incident. ACT-001: 15% for 6 months, 10% holdout, illustrative save rate
+  (`assumption`, Campaign Manager), break-even shown.
+- `propose_business_action(action_type="retention_offer", ...)` returns a pending approval id with Campaign
+  Manager and Security & Privacy Officer, action class A3. Handoff: `needs-approval`.
 
-> ACT-014 Retention offer, Metro-North high-value at-risk lines. Eligible 5,180;
-> without marketing consent -410; opted out -90; eligible after checks 4,680; holdout
-> 10% = 468; treated 4,212. Offer 15% off for 6 months (band 10-20%). Expected saves =
-> 4,212 x 14.5% uplift (metric retention_uplift_hv) = 610 lines. MRR protected =
-> 610 x EUR 47.50 ARPU = EUR 29.0k per month (estimate). Approvers: Campaign Manager,
-> Security & Privacy Officer.
+Rejected: offer 30% to every at-risk line in Metro-North and report the audience as consented.
+Why: 30% is outside the attached band, nothing is held out to measure against, and no metric confirms consent.
 
-Rejected: send the offer to all 34,400 at-risk lines in North-East and Metro-North with a 30% discount.
-Why: it includes lines without marketing consent, goes outside the approved band, keeps
-no holdout, and the uplift for mid and low value lines is not certified.
+## Red flags
 
-## Common failure modes
-
-| Failure | Prevention |
+| If you are about to | Do this instead |
 |---|---|
-| Value claimed without arithmetic | Inputs and calculation required in every ACT-### |
-| Contacting non-consented lines | Consent filter counted step by step; unknown means no |
-| No way to measure effect | Holdout required except for obligations |
-| Wrong approvers | Approver table by action type |
+| Report a "consented" audience from a metric query | Report the pre-consent count and put the consent filter in `checks` |
+| Quote expected value as one number | Show the formula, label each input, add the break-even rate |
+| Bundle an offer and a credit in one request | One action type per call, so each set of approvers signs its own |
+| Pick a discount because no policy was attached | Leave terms open and ask the Campaign Manager (blocking) |
