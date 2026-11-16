@@ -23,8 +23,7 @@ out of scope. Every later Build agent starts from it; the Data Product Owner app
 ## Use when
 
 - A sponsor asks for a new data product or a change to one.
-- The sponsor, outcome, consumers or scope change during a run.
-- Work was returned and someone has to name the stage that owns the fix.
+- Sponsor, outcome, consumers or scope change, or returned work needs an owning stage named.
 
 Not for: rules and consumer questions (build-business-analyst); choosing sources or classifying columns
 (build-source-mapping); platform, cost or design choices (build-solution-architect).
@@ -66,8 +65,8 @@ Not for: rules and consumer questions (build-business-analyst); choosing sources
   Product Owner, Data Steward. Copy them unchanged, because they define who is accountable.
 - Returned work goes to the stage that owns the defect: a rule or definition to build-business-analyst; a
   source, classification or DQ rule to build-source-mapping; design, cost or an ADR to build-solution-architect;
-  generated code to build-data-engineer; missing evidence to build-quality-engineer. A changed outcome or
-  sponsor restarts at G0.
+  generated code to build-data-engineer; missing evidence to build-quality-engineer. A changed outcome restarts
+  at G0.
 
 ## Escalate to a person when
 
@@ -89,16 +88,14 @@ SID domain: <Customer | Product | Service | Resource | Usage>   Freshness asked:
 ### Candidate sources (from metadata; not a mapping)   | System | Table | Owner | Ingestion | Restricted columns |
 ### Stage scope (one row per gate G1 to G9)
 | Gate | Stage | Scope (in / out: reason / deferred: owner) | Approvers |
-### Risks                 | Risk | Owner | Checked at |
-### Open questions and assumptions
+### Risks | Risk | Owner | Checked at |          ### Open questions and assumptions
 ```
 
 ## Definition of done
 
 - [ ] Outcome is measurable; sponsor and every consumer are named or marked `open-question`.
 - [ ] Every candidate table and Restricted column in the brief appears in a metadata result.
-- [ ] Each gate G1 to G9 has a scope value, and every `out` or `deferred` has a reason or owner.
-- [ ] Every risk has an owner and a gate; Restricted columns in candidate tables are among them.
+- [ ] Each gate G1 to G9 has a scope value with a reason or owner; each risk has an owner and a gate.
 - [ ] The Business Analyst can start from the brief alone; G0 was requested on the brief.
 
 ## Worked example
@@ -106,11 +103,10 @@ SID domain: <Customer | Product | Service | Resource | Usage>   Freshness asked:
 Ask (CCO): "We are losing post-paid customers after the October price rise. I need a weekly churn-risk list with
 the reasons." Consumers: retention marketing, care copilot, finance.
 
-- `lookup_glossary` "churn": "A post-paid line disconnected or ported out within 30 days of the score date",
-  steward Data Steward.
+- `lookup_glossary` "churn": line disconnected or ported out within 30 days of score date; steward Data Steward.
 - `list_source_metadata`: `crm_customer` (API batch daily; Restricted `msisdn`, `full_name`, `date_of_birth`),
   `billing_account` and `billing_invoice` (CDC), `xdr_daily` (Iceberg, hourly; Restricted `cell_id`),
-  `care_ticket` (CDC). 6,000 customers in the sandbox.
+  `care_ticket` (CDC).
 - Brief: `dp_subscriber_churn_360`, domain Customer, G1 to G9 in scope including G6 (a risk score is needed).
   Risks: location in `xdr_daily` (Security & Privacy Officer, G2); retention offers are marketing use, so
   consent applies (Data Steward, G1).

@@ -18,8 +18,8 @@ metadata:
 ## Mission
 
 Make every consumer question answerable through one governed definition per metric, by people and by the Consume
-assistants, with a reference answer that proves it. The Data Steward and the Data Product Owner certify the
-result at G8.
+assistants, with a reference answer that proves it. The Data Steward and the Data Product Owner certify it at
+G8.
 
 ## Use when
 
@@ -43,16 +43,16 @@ Not for: defining the business rule behind a metric (build-business-analyst); ch
 
 - Define metrics: one per business measure, each from one `BR`, with formula in words, expression, grain,
   filters, unit, allowed dimensions and owner. Check wording with `lookup_glossary`; define dimensions and
-  synonyms and align entities with `lookup_sid`.
-- Confirm lineage with `get_lineage` for every gold object a metric reads.
+  synonyms, align entities with `lookup_sid` (no match: plain words), and confirm each gold object with
+  `get_lineage`.
 - Write at least one `VQ` per `CQ`. Run its reference SQL with `run_sandbox_sql`, read the result, apply
   small-group suppression, and store the expected answer. If the result does not answer the question as the
   consumer asked it, fix the metric or dimension and rerun.
 - Write the AI context: which metric answers which kind of question, default time grain, how to state freshness
   (or "not specified"), and when to refuse, as short direct statements with reasons.
-- Write refusal tests. One can be executed here: a query naming a Restricted column is refused by the sandbox.
-  The others (out-of-scope domain, metric redefinition, single-subscriber detail) are recorded as expected
-  behaviour for the Consume track, with status `specified`.
+- Write refusal tests. One can be executed here: a query selecting a Restricted column returns only NULL from
+  the sandbox. The others (out-of-scope domain, metric redefinition, single-subscriber detail) are recorded as
+  expected behaviour for the Consume track, with status `specified`.
 - Record metric conflicts with `record_decision`, write `08-semantic/semantic-view.md`, call `request_gate` and
   stop.
 
@@ -64,11 +64,9 @@ Not for: defining the business rule behind a metric (build-business-analyst); ch
   weights small groups like large ones and will not match finance.
 - Expected answers already apply suppression: a group under 10 subscribers is shown as `suppressed`, since the
   Consume runtime suppresses it and an unsuppressed reference would fail every later comparison.
-- Dimensions stop at the mapping's minimisation level. No Restricted column is a dimension, a filter or a
-  synonym target.
-- Counts match the reference exactly; amounts match to the rounding stated in the metric.
-- Reference SQL is plain SELECT over gold tables so the sandbox can run it. The semantic view itself is a
-  generated definition, deployed by the client platform after G8.
+- Dimensions stop at the mapping's minimisation level; no Restricted column is a dimension, filter or synonym.
+- Reference SQL is plain SELECT over gold so the sandbox can run it; the view itself is generated and deployed
+  by the client platform after G8.
 
 ## Escalate to a person when
 
@@ -83,13 +81,11 @@ Not for: defining the business rule behind a metric (build-business-analyst); ch
 
 ```markdown
 # Semantic view: SEMANTIC.<product>
-### Metrics
-| Metric | BR | Definition | Expression | Filter | Gold object | Dimensions | Unit, rounding | Owner |
+### Metrics   | Metric | BR | Definition | Expression | Filter | Gold object | Dimensions | Unit, rounding | Owner |
 ### Dimensions and synonyms
 ### Verified questions
 VQ-001 (CQ-001) "<question>" - metric, dimensions, filters
-SQL: <SELECT over gold>      Expected: <rows; groups under 10 shown as suppressed>
-Executed: yes (date) | no (reason)      Lineage complete: yes | no
+SQL: <SELECT over gold>   Expected: <rows; groups under 10 suppressed>   Executed: yes | no (reason)   Lineage complete: yes | no
 ### AI context           preferred metrics, default grain, freshness statement, refusal rules
 ### Refusal tests        | Test | Request | Expected | Status: executed / specified |
 ### Unanswerable questions | CQ | Reason | Owner |
@@ -107,19 +103,17 @@ Executed: yes (date) | no (reason)      Lineage complete: yes | no
 Churn run. CQ-001 "Which regions have the highest churn risk this week?" CQ-002 "How much monthly revenue is at
 risk?"
 
-- `lookup_glossary` "at-risk arpu": monthly ARPU of lines with churn score >= 0.7.
 - `churn_at_risk_lines` = COUNT(*) where `risk_score >= 0.7` (BR-001); dimensions region, value_segment,
-  top_driver. `at_risk_arpu` = ROUND(SUM(arpu), 2), same filter.
+  top_driver. `at_risk_arpu` = ROUND(SUM(arpu), 2), same filter (`lookup_glossary` "at-risk arpu": score >=
+  0.7).
 - VQ-001, `run_sandbox_sql` on `gld_churn_risk` by region: North-East 80, Metro-North 62, Industrial-South 11,
   Capital 10, Coastal 9. Expected answer stores Coastal as `suppressed`.
-- VQ-002: 172 lines, EUR 6,715.24 per month.
-- `get_lineage` `gld_churn_risk`: complete.
-- Refusal test R-01 "list the MSISDN of at-risk lines in North-East": `SELECT msisdn ...` refused by the
-  sandbox, `executed`. R-02 "what is churn if we use 60 days": `specified`.
+- VQ-002: 172 lines, EUR 6,715.24 per month. `get_lineage` `gld_churn_risk`: complete.
+- Refusal test R-01 "list the MSISDN of at-risk lines in North-East": `SELECT msisdn ...` returns NULL only,
+  `executed`. R-02 "what is churn if we use 60 days": `specified`.
 
 Rejected: `churn_rate_30d` for all regions as the average of the five regional rates (3.97%).
-Why: the metric is SUM(churned_30d) / COUNT(*) = 237 / 6,000 = 3.95%; averaging rates misweights regions and
-would differ from finance.
+Why: the metric is SUM(churned_30d) / COUNT(*) = 237 / 6,000 = 3.95%; averaging misweights regions.
 
 ## Red flags
 

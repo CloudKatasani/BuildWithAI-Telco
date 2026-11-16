@@ -17,15 +17,14 @@ metadata:
 
 ## Mission
 
-Write requirements precise enough that mapping, build and test can proceed without asking what a term means. The
-Data Product Owner and the Data Steward approve them at G1, and the Quality Engineer later takes expected
-results from the worked examples.
+Write requirements precise enough that mapping, build and test need not ask what a term means. The Data Product
+Owner and the Data Steward approve them at G1; the Quality Engineer takes expected results from the worked
+examples.
 
 ## Use when
 
 - The intake brief exists and requirements have not been written or need rework.
-- A consumer adds a question, or two consumers define the same measure differently.
-- A later stage returns a rule it could not map, build or test.
+- A consumer adds a question, two consumers define one measure differently, or a later stage returns a rule.
 
 Not for: scoping the run (build-orchestrator); finding source columns or classifying them
 (build-source-mapping); certified metric formulas and verified questions (build-semantic-context).
@@ -59,14 +58,13 @@ Not for: scoping the run (build-orchestrator); finding source columns or classif
   two rules. Care, marketing and finance have to report the same number.
 - A number nobody gave is an open question. A glossary or domain-pack value (for example at-risk means score >=
   0.7) may be used when the rule cites it.
-- "Real time" is not a requirement. Ask for the latency in minutes and the decision that needs it, because the
-  answer decides between batch and streaming cost at G3.
+- "Real time" is not a requirement: ask for the latency in minutes and the decision that needs it.
 - A `CQ` that needs personal data states the minimisation need: aggregate to groups of at least 10,
   pseudonymise, or drop. Mapping applies TEL-C1 and TEL-C4 from that note.
 - Marketing use of usage or billing data gets its own consent `BR` (TEL-C3), so the consent filter is tested and
   not left to each consumer.
-- Requirements name business terms, not tables, columns or platforms. Choosing those here would bind mapping and
-  design before the evidence is in.
+- Requirements name business terms, not tables, columns or platforms. Those are chosen with evidence at mapping
+  and design.
 
 ## Escalate to a person when
 
@@ -81,24 +79,22 @@ Not for: scoping the run (build-orchestrator); finding source columns or classif
 
 ```markdown
 # Requirements: <dp_name>
-### Business rules
-### BR-001 <name>   label: fact | assumption (owner) | open-question (role)
+### Business rules: BR-001 <name>   label: fact | assumption (owner) | open-question (role)
 Statement: <...>  Scope: <...>  Exclusions: <...>  Source of definition: <glossary | answer id | person>
 Worked example: <synthetic case and its expected result>
 Acceptance: <what a tester checks, against which expected value>
 ### Non-functional requirements
 NFR-001 <freshness | retention | access | consent>: <measurable statement> (control: TEL-Cn / STD-nn)
 ### Consumer questions
-CQ-001 "<question in the consumer's words>" - consumer, decision, depends on BR-..., NFR-...,
-minimisation: <none | aggregate >= 10 | pseudonymise>
+CQ-001 "<consumer's words>" - consumer, decision, depends on BR-/NFR-, minimisation: none | aggregate >= 10 | pseudonymise
 ### Glossary gaps / Open questions
 ```
 
 ## Definition of done
 
-- [ ] Every `BR` has a worked example and an acceptance criterion, or is flagged "not testable yet".
+- [ ] Every `BR` has a worked example and an acceptance criterion, or is flagged "not testable yet"; every value
+      cites the glossary, an answer or a person.
 - [ ] Every `CQ` traces to a `BR`; every `BR` serves a `CQ`; no table or platform is named.
-- [ ] Every threshold, window and period cites the glossary, an answer or a person.
 - [ ] Each personal-data use has a consent or lawful-basis `NFR` and a minimisation note.
 - [ ] Source Mapping can list the attributes needed from this file alone; G1 was requested on it.
 
@@ -107,13 +103,12 @@ minimisation: <none | aggregate >= 10 | pseudonymise>
 Churn run. Attached answers: OQ-001 "churn window is 30 days for all post-paid lines, including SIM-only";
 OQ-002 "lines in collections or fraud hold are excluded". Standards: STD-04, STD-05.
 
-- `lookup_glossary` "churn": post-paid line disconnected or ported out within 30 days of the score date.
-  `lookup_sid` "subscription": Product, TMF637.
+- `lookup_glossary` "churn": disconnected or ported out within 30 days. `lookup_sid` "subscription": Product,
+  TMF637.
 - BR-001 Churn, per glossary and OQ-001. Example: scored Monday, ported out 21 days later: churned; disconnected
   34 days later: not churned.
 - BR-002 Exclude lines in collections or fraud hold (OQ-002). BR-003 Retention offers go only to lines with
-  marketing consent 'Y' (TEL-C3, STD-05).
-- NFR-001 List ready Monday 06:00 UTC (STD-04). NFR-002 Joins use the pseudonymous subscriber key.
+  marketing consent 'Y' (TEL-C3, STD-05). NFR-001 List ready Monday 06:00 UTC (STD-04).
 - CQ-001 "Which regions have the highest churn risk this week?" CQ-002 "How much monthly revenue is at risk?"
   Both depend on BR-001; minimisation: aggregate >= 10.
 

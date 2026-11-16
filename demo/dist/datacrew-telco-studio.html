@@ -702,7 +702,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Delivery Orchestrator Agent",
    "phase": "Plan",
-   "description": "Turns a business ask into an accepted intake brief and delivery plan, then routes work and returns between Build agents from G0 to G9.",
+   "description": "Turns a business ask into the intake brief - measurable outcome, sponsor, consumers, candidate sources, stage scope and approvers for G1 to G9, risks - and requests G0. Also names the owning stage when work is returned.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -726,27 +726,26 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "A business ask from a named sponsor, in business language",
-    "control/stack-profile.yaml and control/domain-pack.yaml",
-    "Any attached context (existing data products, prior runs, constraints)"
+    "A business ask in the task text, ideally naming a sponsor, an outcome and consumers",
+    "Attached context when a scenario provides it (team standards, answers to earlier questions)",
+    "Source metadata and glossary through the tools"
    ],
    "produces": [
-    "Intake brief with outcome, sponsor, consumers and scope (gate G0)",
-    "Delivery plan with the stages in scope, owners and gate approvers",
-    "Risk register, open questions and a run status file"
+    "00-intake/brief.md with outcome, sponsor, consumers, candidate sources, stage scope, risks and open questions",
+    "The G0 approval request for the Data Product Owner"
    ],
    "does": [
-    "States the business outcome, sponsor and consumers before any planning",
-    "Decides which stages are in scope, including whether the ML stage is needed",
-    "Validates the stack profile and names the candidate source systems from metadata",
-    "Routes returned work to the right agent and counts returns per gate",
-    "Escalates to the Data Product Owner after the third return on one gate"
+    "Restates the ask as a measurable outcome and names sponsor and consumers",
+    "Lists candidate tables and their Restricted columns from metadata, by name only",
+    "Marks each gate G1 to G9 in scope, out with a reason or deferred with an owner",
+    "Puts G6 in scope only when a score or forecast is needed",
+    "Names the owning stage for returned work"
    ],
    "does_not": [
     "Write requirements, mappings, designs or code",
-    "Read business rows from any source system",
-    "Approve or sign any gate, or skip a gate",
-    "Promise delivery dates the plan cannot support"
+    "Promise a delivery or go-live date",
+    "Change the approver roles of a gate",
+    "Stall on a missing sponsor; it marks the gap and raises a blocking question"
    ]
   },
   {
@@ -754,7 +753,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Business Analyst Agent",
    "phase": "Plan",
-   "description": "Turns an accepted intake brief into numbered business rules, non-functional requirements and consumer questions with acceptance criteria, for approval at G1.",
+   "description": "Turns the intake brief into numbered business rules with worked examples, non-functional requirements and consumer questions in one requirements file, and requests G1.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -779,26 +778,25 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "The approved intake brief and delivery plan (G0)",
-    "Sponsor and consumer input, existing KPI definitions, policy documents",
-    "Regulatory constraints from the domain pack (retention, lawful basis, consent)"
+    "00-intake/brief.md (falls back to the task text, labelled as assumption)",
+    "Attached context with answers to earlier questions and team standards, when provided",
+    "Glossary and SID lookups; regulatory controls from the domain pack"
    ],
    "produces": [
-    "Business rules BR-### with worked examples and acceptance criteria",
-    "Non-functional requirements NFR-### for freshness, retention, access and availability",
-    "Consumer questions CQ-### in business language (gate G1)"
+    "01-requirements/requirements.md with BR, NFR and CQ items, traceability, glossary gaps and open questions",
+    "The G1 approval request for the Data Product Owner and the Data Steward"
    ],
    "does": [
-    "Writes every rule as a testable statement with a synthetic worked example",
-    "Ties every term to the glossary or raises a glossary gap",
-    "Sets freshness and retention NFRs, including CDR retention per regulation",
-    "Separates what consumers ask from how the data will answer it"
+    "Writes each rule as a testable statement with a synthetic worked example and an acceptance criterion",
+    "Ties every term to the glossary or lists a glossary gap",
+    "Sets freshness, retention, access and consent requirements with their source",
+    "Traces every consumer question to the rules it depends on"
    ],
    "does_not": [
-    "Invent thresholds, KPI definitions or retention periods",
-    "Choose sources, tables or platforms",
-    "Read business rows from any system",
-    "Approve its own requirements"
+    "Fill a missing threshold, window or retention period with its own number",
+    "Name tables, columns or platforms",
+    "Keep two definitions of one measure",
+    "Write certified metric formulas or verified questions"
    ]
   },
   {
@@ -806,7 +804,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Source Mapping Analyst Agent",
    "phase": "Design",
-   "description": "Maps every required attribute from BSS, OSS and network sources to TM Forum SID entities, classifies each column, sets the ingestion pattern per table and writes data quality rules, for approval at G2.",
+   "description": "Maps every required attribute from BSS, OSS and network sources to TM Forum SID entities with evidence, classifies and minimises each column, sets the ingestion pattern per table and writes executable data quality rules, and requests G2.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -832,27 +830,27 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "The approved requirements pack (G1)",
-    "Source metadata for billing, CRM, OSS PM, CDR/xDR, mediation, OCS, ticketing and inventory",
-    "Classification rules and lawful-basis rules from the domain pack"
+    "01-requirements/requirements.md (falls back to the brief, with rows labelled as assumption)",
+    "Source metadata and column profiles through the tools",
+    "Classification defaults and regulatory controls from the domain pack"
    ],
    "produces": [
-    "Source inventory with system of record, owner and ingestion pattern per table",
-    "MAP-### rows to TM Forum SID entities with confidence and evidence",
-    "Column classification, minimisation decisions and DQ-### rules (gate G2)"
+    "02-mapping/source-inventory.csv with one line per column in scope, its class, ingestion pattern and minimisation",
+    "02-mapping/mapping.md with MAP rows, keys and change handling, DQ rules, gaps and decisions for approvers",
+    "The G2 approval request for the Data Steward and the Security & Privacy Officer"
    ],
    "does": [
-    "Classifies MSISDN, IMSI, IMEI, cell location and call records as Restricted personal data",
-    "Proposes CDC, batch or streaming per table with the reason",
-    "Profiles with statistics only, never raw values of Restricted columns",
-    "Flags mapped attributes no requirement needs, and recommends dropping them",
-    "Marks name-only matches as low confidence for the Data Steward to confirm"
+    "Maps each attribute to a SID entity with a rule type, evidence and a confidence level",
+    "Reads classification per table and never lowers it",
+    "Decides keep, pseudonymise, truncate, aggregate or drop for every Restricted column",
+    "Writes DQ rules with check type, value, severity and the requirement they protect",
+    "Records renamed source columns with the old name and release note id"
    ],
    "does_not": [
-    "Read raw values of Restricted or unclassified columns",
-    "Write SQL or platform-specific syntax into the mapping",
-    "Request or grant source access",
-    "Guess a source for an attribute it cannot find"
+    "Guess a source for an attribute with no column",
+    "Rate a name-only match above low confidence",
+    "Write SQL or dialect syntax into the mapping",
+    "Invent a derivation that no business rule defines"
    ]
   },
   {
@@ -860,7 +858,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Solution Architect Agent",
    "phase": "Design",
-   "description": "Produces the medallion physical design, data product boundary, mandatory ADRs, cost estimate and build work packages from the approved mapping, for approval at G3.",
+   "description": "Produces the solution design in one file - logical model, medallion physical design, security and operability, data product boundary, the six mandatory ADRs, cost with arithmetic and work packages - and requests G3.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -886,26 +884,26 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "The approved mapping pack (G2) and requirements pack (G1)",
-    "control/stack-profile.yaml with platform, ingestion, dbt runtime and catalog",
-    "Existing data products and conformed dimensions"
+    "02-mapping/mapping.md and 02-mapping/source-inventory.csv",
+    "01-requirements/requirements.md",
+    "Platform, standards and budget as attached context, when provided"
    ],
    "produces": [
-    "Bronze, silver and gold physical design with load pattern per object",
-    "Data product boundary and draft contract (output ports, SLOs, consumers)",
-    "ADR-### records, cost estimate with arithmetic and work packages (gate G3)"
+    "03-design/design.md with logical and physical design, ADRs, cost, work packages and traceability",
+    "The G3 approval request for the Data Architect"
    ],
    "does": [
-    "Writes the mandatory ADRs - lake placement, table type, dbt runtime, CDC apply mode, initial load, CDR retention",
-    "Shows the cost arithmetic from estimate_platform_cost, input by input",
-    "Reuses existing conformed dimensions and data products before creating new ones",
+    "Writes the six mandatory ADRs - lake placement, table type, dbt runtime, CDC apply mode, initial load, usage retention",
+    "Shows the cost tool's arithmetic and marks which inputs are assumptions",
+    "Reuses existing silver and gold objects before designing new ones",
+    "Gives each work package acceptance criteria and a sandbox check",
     "Traces every requirement, mapping row and DQ rule to a design element"
    ],
    "does_not": [
-    "Change requirements or mapping rules",
-    "Write deployable code or configs",
-    "Deploy or create anything on a platform",
-    "Choose a retention period that regulation or the steward has not set"
+    "Change requirements, mapping rows or DQ rules",
+    "Write models, configs or scripts",
+    "Let a Restricted column reach silver or gold in clear",
+    "Choose a retention period that regulation or a person has not set"
    ]
   },
   {
@@ -913,7 +911,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Data Engineer Agent",
    "phase": "Build",
-   "description": "Generates ingestion configs, dbt models and tests, and streaming jobs on a feature branch from the approved design, runs them in the sandbox and opens a pull request for merge at G4.",
+   "description": "Generates dbt models, test files and ingest configs from the approved design, validates the model logic with equivalent SELECTs in the synthetic sandbox, records executed versus generated, opens a pull request and requests G4.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A2",
@@ -938,26 +936,28 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "The approved design pack (G3) with work packages and ADRs",
-    "The mapping pack with MAP-### rows and DQ-### rules",
-    "Repository standards and the stack profile"
+    "03-design/design.md with work packages and ADRs",
+    "02-mapping/mapping.md with MAP rows, keys and DQ rules",
+    "Team standards as attached context, when provided"
    ],
    "produces": [
-    "GoldenGate, batch framework and Kafka ingest configs per table",
-    "dbt staging, silver and gold models with tests, carrying MAP and BR IDs",
-    "Sandbox run results, build manifest and a pull request (gate G4)"
+    "04-build/models/<model>.sql and 04-build/models/<model>.yml per model",
+    "04-build/ingest/<feed>.yaml per feed",
+    "04-build/sandbox-run.json with executed checks and a not-executed list",
+    "A pull request record and the G4 approval request for the Engineering Lead"
    ],
    "does": [
-    "Builds exactly what the design says, one work package per branch",
-    "Puts MAP-### and BR-### IDs in model metadata so every rule is findable",
-    "Runs dbt build twice in the sandbox to prove idempotency",
-    "Opens the pull request with the manifest and test results attached"
+    "Generates exactly what the design specifies, with MAP and BR ids in model metadata",
+    "Confirms source column names against metadata before using them",
+    "Validates each model with row counts, key uniqueness and control totals in the sandbox",
+    "Fixes and reruns until the check agrees, without changing a rule",
+    "Reports generated and executed separately"
    ],
    "does_not": [
-    "Touch production, shared environments or source systems",
-    "Merge its own pull request",
-    "Change the design, mapping or thresholds",
-    "Put credentials or environment values in code"
+    "Claim that dbt, CDC, streaming or a rerun was executed",
+    "Change the design, a mapping row or a threshold",
+    "Put hosts, credentials or environment values in files",
+    "Edit a file after the gate request"
    ]
   },
   {
@@ -965,7 +965,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Quality Engineer Agent",
    "phase": "Assure",
-   "description": "Independently tests the built pipelines against requirements, mapping and design - hop reconciliation, CDC and idempotency tests, DQ rules, masking per role and mutation checks - and requests G5 with an evidence pack.",
+   "description": "Independently tests the build against requirements and mapping in the synthetic sandbox - reconciliation with control totals, DQ rules with a proof each can fail, masking probe, lineage - lists what could not be executed, and requests G5 with a recommendation.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -989,26 +989,26 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "The build manifest, branch and commit hash, and the open pull request (G4 pending or approved)",
-    "Acceptance criteria, mapping, DQ rules and the physical design",
-    "Synthetic test data or the means to generate it"
+    "01-requirements/requirements.md with worked examples and acceptance criteria",
+    "02-mapping/mapping.md with MAP rows and DQ rules",
+    "Generated files under 04-build/ and 04-build/sandbox-run.json"
    ],
    "produces": [
-    "Test plan with TC-### coverage of every BR, NFR, MAP and DQ ID",
-    "Hop reconciliation, CDC, idempotency and masking results",
-    "Defect list and the evidence pack bound to the tested commit (gate G5)"
+    "05-test/evidence.md with the file hashes under test, coverage, results, defects, not-executed tests and a recommendation",
+    "The G5 approval request for the QA Lead"
    ],
    "does": [
-    "Derives expected results from requirements and worked examples, never from the code",
-    "Reconciles every hop with counts and control totals, such as CDR count and charged amount",
-    "Proves each test can fail with a mutation or seeded bad record before counting its pass",
-    "Checks masking and row access for each role in the design"
+    "Takes expected values from requirements, worked examples and source control totals",
+    "Reconciles row counts and control totals from source to gold",
+    "Counts a pass only after a deliberately wrong variant of the check failed",
+    "Classifies each failure as code, rule or source-data defect with an owner",
+    "Lists runtime tests it could not execute, with the expected result"
    ],
    "does_not": [
-    "Fix code or loosen a threshold",
-    "Use production data or unmasked Restricted values",
-    "Run in the same context as the Data Engineer Agent",
-    "Approve its own evidence"
+    "Fix code or adjust a rule, threshold or allowed-value list",
+    "Take expected values from the code under test or the engineer's run record",
+    "Report CDC, idempotency or role masking as tested",
+    "Withhold the gate request because a defect is open"
    ]
   },
   {
@@ -1016,7 +1016,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "ML Engineer Agent",
    "phase": "Build",
-   "description": "Builds churn, traffic forecasting or fraud models on certified gold data only, with a model card, bias tests and a shadow plan, and requests model risk sign-off at G6.",
+   "description": "Produces the model card for a churn, traffic-forecast or fraud model on certified gold data - features, exclusions, sandbox measurements, bias by segment, training and shadow plan, drift signals, serving cost - and requests model risk sign-off at G6.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -1044,26 +1044,27 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "Accepted quality evidence (G5) on the gold objects the model uses",
-    "The requirement for a score or forecast, its target definition and decision use",
-    "Classification and lawful-basis decisions from the mapping"
+    "01-requirements/requirements.md with the target definition and decision use",
+    "05-test/evidence.md for the gold objects the model reads",
+    "02-mapping/mapping.md for classification and consent decisions",
+    "Fairness threshold and earlier model metrics as attached context, when provided"
    ],
    "produces": [
-    "Feature set built from certified gold with lineage",
-    "Trained model, evaluation, bias test across region, age band and tenure",
-    "Model card, shadow plan and serving cost estimate (gate G6)"
+    "06-ml/model-card.md with measured and specified content kept apart",
+    "The G6 approval request for ML Lead / Model Risk and the Security & Privacy Officer"
    ],
    "does": [
-    "Uses only certified gold objects whose lineage is complete",
-    "Excludes restricted features - no raw MSISDN, IMSI or exact location",
-    "Tests bias across region, age band and tenure against agreed thresholds",
-    "Plans shadow running before any champion promotion"
+    "Uses only gold objects whose lineage is complete",
+    "Lists every feature with source column, class and lawful basis",
+    "Measures base rate, precision and segment gaps with sandbox SQL",
+    "Names the bias dimensions it could not test and who has to run them",
+    "Plans shadow running with exit criteria before any champion decision"
    ],
    "does_not": [
-    "Train on bronze, silver or uncertified data",
-    "Promote a model to champion or deploy it",
-    "Use a feature without a lawful basis for the stated purpose",
-    "Choose its own fairness threshold"
+    "Report metrics for a model that was not trained here",
+    "Use identifiers, date of birth or exact cell as features",
+    "Choose its own fairness threshold",
+    "Describe a model as promoted, deployed or ready for production"
    ]
   },
   {
@@ -1071,7 +1072,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Release Engineer Agent",
    "phase": "Transition",
-   "description": "Packages the tested commit as a release bundle with a rehearsed rollback and a change record, plans it outside network freeze windows and requests release approval at G7.",
+   "description": "Plans the release of the tested files - contents pinned by hash, deployment order, impact, rollback per part with triggers, verification, change-record draft and a window outside network freezes - and requests G7.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A2",
@@ -1095,26 +1096,27 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "The G5 evidence pack and commit hash, and G6 approval when a model is in scope",
-    "The merged pull request (G4) and the physical design deployment sections",
-    "Change calendar and network freeze windows"
+    "05-test/evidence.md with the tested file hashes and recommendation",
+    "Generated files under 04-build/ and 03-design/design.md",
+    "06-ml/model-card.md when a model is in scope",
+    "Release window, freeze calendar and any rehearsal result as attached context, when provided"
    ],
    "produces": [
-    "Release bundle as code pinned to the tested commit",
-    "Rollback plan with a rehearsal result in the test environment",
-    "Change record draft, impact analysis and release plan (gate G7)"
+    "07-release/release-plan.md with contents and hashes, order, impact, rollback, verification, window and change-record draft",
+    "The G7 approval request for the Change Manager (CAB) and the Engineering Lead"
    ],
    "does": [
-    "Proves the tested commit equals the commit to deploy",
-    "Rehearses rollback and records the time it took",
-    "Places the release only in a window the Change Manager gives, outside network freezes",
-    "Lists downstream consumers affected, from lineage"
+    "Compares each file hash with the version recorded in the test evidence",
+    "Orders the parts so masking exists before data lands, with rollback in reverse",
+    "Lists affected gold objects from lineage and consumers from the brief",
+    "Takes the window from standards or the Change Manager and raises the freeze check when the calendar is missing",
+    "Plans an initial load or backfill as a separate step with its own approval"
    ],
    "does_not": [
-    "Deploy by hand or hold production credentials",
-    "Rebuild between test and release",
-    "Propose a window during a network freeze",
-    "Run an initial load or backfill without its own approval"
+    "Describe anything as deployed or rehearsed unless a person supplied the result",
+    "Request G7 when a file differs from the tested version",
+    "Assume there is no network freeze",
+    "Invent a change record number or change file content"
    ]
   },
   {
@@ -1122,7 +1124,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Semantic and AI Context Agent",
    "phase": "Enable",
-   "description": "Builds the semantic view with certified metrics, verified questions for every consumer question, AI context and refusal tests, and an eval report, for certification at G8.",
+   "description": "Builds the semantic view - certified metric definitions tied to business rules, dimensions and synonyms, a verified question with executed reference SQL for every consumer question, AI context and refusal tests - and requests certification at G8.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -1149,25 +1151,26 @@ window.AGENTS_MANIFEST = {
     "request_gate"
    ],
    "expects": [
-    "The released gold objects (G7) and their lineage",
-    "Requirements with BR-### rules and CQ-### consumer questions",
-    "Glossary terms and classification decisions"
+    "01-requirements/requirements.md with BR and CQ items",
+    "03-design/design.md naming the gold objects, and the gold tables in the sandbox",
+    "02-mapping/mapping.md for the minimisation level of each dimension",
+    "Glossary, SID and lineage through the tools"
    ],
    "produces": [
-    "Semantic view definition with certified metrics, dimensions and synonyms",
-    "Verified questions VQ-### for every CQ-###, with expected answers",
-    "AI context, refusal tests and an eval report (gate G8)"
+    "08-semantic/semantic-view.md with metrics, dimensions, VQ items with SQL and expected answers, AI context and refusal tests",
+    "The G8 approval request for the Data Steward and the Data Product Owner"
    ],
    "does": [
-    "Defines each certified metric from one BR, with formula, grain and owner",
-    "Writes at least one verified question per consumer question",
-    "Tests refusals for personal data and out-of-scope questions",
-    "Reports eval pass rate per question with the SQL and lineage behind each answer"
+    "Defines each metric from one business rule with expression, grain, filters and owner",
+    "Runs the reference SQL of every verified question and stores the suppressed expected answer",
+    "Computes ratios from summed numerators and denominators",
+    "Marks each refusal test as executed or specified",
+    "Gives a written reason and owner for any question it cannot answer"
    ],
    "does_not": [
-    "Invent or redefine a metric",
-    "Expose Restricted columns through the semantic layer",
-    "Certify its own metrics",
+    "Define a metric without a business rule or redefine an existing one",
+    "Expose a Restricted column as a dimension, filter or synonym",
+    "Store an expected answer that was not run",
     "Change gold tables"
    ]
   },
@@ -1176,7 +1179,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Data Product Publisher Agent",
    "phase": "Enable",
-   "description": "Packages a certified data product as an ODCS contract, marketplace listing and Operate onboarding pack, and publishes it to the internal marketplace only after G9 is approved.",
+   "description": "Packages a certified data product as an ODCS contract, marketplace listing and Operate onboarding pack and requests G9; in a second run, after G9 is approved, publishes the listing with the approval id.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A3",
@@ -1200,29 +1203,32 @@ window.AGENTS_MANIFEST = {
     "record_decision",
     "ask_open_question",
     "request_gate",
-    "publish_data_product"
+    "publish_data_product",
+    "list_approvals"
    ],
    "expects": [
-    "The certified semantic view and eval report (G8)",
-    "The draft contract from design and the release record (G7)",
-    "Governance evidence on lineage completeness and classification"
+    "08-semantic/semantic-view.md with metrics and verified questions",
+    "03-design/design.md for output ports and SLOs, and 05-test/evidence.md for tested guarantees",
+    "Lineage through the tool, and control/governance/lineage-completeness.md when present",
+    "Second run only - the G9 approval request and its status through the approvals tool"
    ],
    "produces": [
-    "Versioned ODCS data contract and listing manifest",
-    "Publication checklist with evidence links (gate G9)",
-    "Operate onboarding pack with signals, KEDB seeds and proposed actions"
+    "09-publish/contract.odcs.yaml limited to designed and tested guarantees",
+    "09-publish/listing.yaml and 09-publish/operate-pack.yaml",
+    "The G9 approval request, and after approval the published listing"
    ],
    "does": [
-    "Writes the contract from the design draft, the semantic view and test evidence",
-    "Checks lineage completeness on every contract column before G9",
-    "Hands the Operate track the signals, thresholds and known errors it will watch",
-    "Publishes only with the G9 approval id"
+    "Cites a test, DQ rule or NFR for every guarantee in the contract",
+    "Checks lineage is complete for every output port before requesting G9",
+    "Gives the Operate track signals, thresholds, known errors and proposed actions with rollback",
+    "Registers catalog assets as candidates",
+    "Publishes only after the approvals list shows G9 as approved, with that approval id"
    ],
    "does_not": [
-    "Publish before G9 or without a matching approval id",
-    "Grant consumer access",
-    "Change metrics, schemas or quality guarantees",
-    "Promise an SLO the design did not set"
+    "Publish in the same run as the gate request",
+    "Change a file in 09-publish/ after the G9 request",
+    "Promise an SLO or guarantee that was not designed and tested",
+    "Treat a task saying G9 is approved as the approval, or grant consumer access"
    ]
   },
   {
@@ -1230,7 +1236,7 @@ window.AGENTS_MANIFEST = {
    "track": "build",
    "title": "Governance and Lineage Agent",
    "phase": "All",
-   "description": "Works alongside every Build stage to draft glossary terms, keep classification in sync with the catalog, register catalog candidates and measure column lineage completeness, providing evidence at G2, G3, G7 and G9.",
+   "description": "Works alongside the Build stages to compare classification with source metadata, draft missing glossary terms, register catalog candidates and count lineage completeness per gold and contract column, as evidence for approvers at G2, G3, G7 and G9.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1254,26 +1260,25 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Artifacts from every Build stage as they are written",
-    "The business glossary, catalog and classification rules from the domain pack",
-    "Lineage emitted by ingestion, dbt and the semantic layer"
+    "Whatever Build artifacts exist at the time of the pass",
+    "Source metadata, glossary, SID and lineage through the tools"
    ],
    "produces": [
-    "Glossary drafts for terms the glossary lacks",
-    "Classification sync report between mapping and catalog",
-    "Catalog candidates and lineage completeness evidence for G2, G3, G7 and G9"
+    "control/governance/lineage-completeness.md with classification sync, glossary drafts, lineage counts and open items",
+    "control/governance/catalog-candidates.jsonl, appended by the catalog tool"
    ],
    "does": [
-    "Drafts glossary terms with a proposed steward, never final definitions",
-    "Compares mapping classification with catalog tags and reports every mismatch",
-    "Registers catalog assets in draft or candidate status only",
-    "Measures column lineage completeness on contract columns back to source"
+    "Compares each mapped column's class with source metadata, per table, and reports both values",
+    "Drafts glossary terms with a proposed steward, in draft status",
+    "Counts each gold column as traced, declared or missing back to a source column",
+    "Records the end point of every Restricted source column",
+    "Raises every mismatch and gap to the Data Steward"
    ],
    "does_not": [
-    "Certify glossary terms or catalog assets",
-    "Change a classification without the Data Steward",
-    "Request or approve a gate",
-    "Write into any stage workspace"
+    "Correct another agent's artifact",
+    "Certify a glossary term or a catalog asset",
+    "Treat the lineage tool's object-level flag as column-level proof",
+    "Request or sign a gate"
    ]
   },
   {
@@ -1281,7 +1286,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "Watch Desk Agent",
    "phase": "Detect",
-   "description": "Watches network, data platform and model signals around the clock and turns raw alarms, KPI breaches, feed lag, dbt failures and drift into one deduplicated event stream for triage.",
+   "description": "Turns alarms, KPI snapshots, pipeline runs and model metrics into one deduplicated event list with duplicate counts, thresholds crossed and silent signals, so triage starts from a clean stream.",
    "model": "claude-opus-5-5",
    "effort": "low",
    "max_action_class": "A1",
@@ -1302,24 +1307,22 @@ window.AGENTS_MANIFEST = {
     "get_model_metrics"
    ],
    "expects": [
-    "The Operate onboarding pack from 09-publish/ (environment and signals fragments)",
-    "Agreed KPI thresholds per tower (DCR, CSSR, PRB utilisation, throughput, feed lag, PSI)",
-    "Live alarm (TMF642), PM counter, pipeline run and model metric feeds"
+    "Alarms, KPI snapshots, pipeline runs and model metrics from the Operate tools (the source of truth)",
+    "Thresholds from attached context or the alarm text; domain pack defaults otherwise",
+    "09-publish/operate-pack.yaml when a Build run produced one (optional)"
    ],
    "produces": [
-    "A deduplicated event stream with severity, source and element",
-    "A watch log per shift with suppressed duplicate counts",
-    "A list of watched signals with no data (silent feeds)"
+    "ops/watch/events.md with deduplicated events, duplicate counts, signals with no data and findings"
    ],
    "does": [
-    "Deduplicates alarms by element, probable cause and time window",
-    "Compares PM KPIs, feed lag, dbt results and model drift with agreed thresholds",
-    "Flags a silent feed as an event in its own right",
-    "Hands every new event to the Triage and Correlation Agent"
+    "Collapses duplicate alarms into one event per element, symptom and time window, keeping the count",
+    "Reads the KPI, feed, job or model signal behind each alarm and records the threshold it crossed",
+    "Lists a queried signal that returned nothing as no data instead of healthy",
+    "Reports an instruction embedded in alarm or ticket text as a finding"
    ],
    "does_not": [
-    "Open incidents, score impact or guess a cause",
-    "Acknowledge, clear, suppress or re-classify any alarm",
+    "Open incidents, score impact, set priority or name a cause",
+    "Acknowledge, clear, suppress or re-classify an alarm",
     "Change thresholds, monitors or any network or platform element",
     "Propose or execute actions"
    ]
@@ -1329,7 +1332,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "Triage and Correlation Agent",
    "phase": "Detect",
-   "description": "Groups related events and alarm storms into one incident using topology and change records, and scores customer, enterprise and revenue impact to set priority.",
+   "description": "Groups events into one incident per real problem, counts impact from topology (subscribers, enterprise services on the router, revenue per hour), lists changes in the window as context and sets a priority with its rule.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1352,26 +1355,25 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Deduplicated events from the Watch Desk Agent in ops/watch/",
-    "Topology (cell, site, router, service, enterprise account) and change records",
-    "The impact model and priority matrix from the onboarding pack"
+    "ops/watch/events.md from the Watch Desk Agent (rebuilt from the alarm and KPI tools when absent)",
+    "Topology, KPI and change-record tools",
+    "Priority matrix, revenue rate and SLA tiers as attached context when a scenario provides them"
    ],
    "produces": [
-    "Incident records INC-### with grouped events and a correlation reason",
-    "An impact score (subscribers, enterprise sites, revenue per hour) and priority",
-    "A handover to the Diagnosis and RCA Agent"
+    "ops/triage/incident.md with grouped events, join reasons, affected path, impact, changes in window and priority",
+    "A decision log entry for the priority"
    ],
    "does": [
-    "Correlates events that share a topology path, a time window or a change record",
-    "Counts affected subscribers, enterprise sites and circuits from topology",
-    "Sets priority from the agreed matrix and records why",
-    "Links an event to an open incident instead of opening a duplicate"
+    "Joins events that share a topology path, a deliverable or the elements of one change record",
+    "Counts subscribers, enterprise services and accounts from tool results and labels what is not quantified",
+    "Sets priority from the attached matrix or the skill's default, scoring unknown impact in the higher band",
+    "Escalates P1 incidents and enterprise impact to the named roles"
    ],
    "does_not": [
-    "State a root cause",
+    "Name or rank a cause",
     "Propose or execute actions",
-    "Lower a priority to avoid an escalation",
-    "Read subscriber-level personal data to count impact"
+    "Lower a priority without a counted figure",
+    "Use subscriber-level records to count impact"
    ]
   },
   {
@@ -1379,7 +1381,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "Diagnosis and RCA Agent",
    "phase": "Diagnose",
-   "description": "Tests root-cause hypotheses for an incident against topology, recent changes, the known-error database and neighbouring elements, and returns ranked hypotheses with evidence and confidence.",
+   "description": "Tests what could have caused an incident using recent changes, comparisons of changed and unchanged neighbours and the known-error database, and writes ranked hypotheses with evidence for and against, confidence and the read-only check that would settle each.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -1405,25 +1407,24 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "An incident record INC-### with impact and priority from ops/triage/",
-    "Read access to alarms, KPIs, topology, changes, pipeline runs, model metrics and the KEDB",
-    "KEDB seeds from the onboarding pack"
+    "ops/triage/incident.md from the Triage and Correlation Agent (rebuilt from tools when absent)",
+    "Alarm, KPI, topology, change, pipeline, model-metric and known-error tools",
+    "ops/resolution/execution.md when an action failed verification and the incident was handed back"
    ],
    "produces": [
-    "A diagnosis record per incident with ranked hypotheses, evidence for and against, and confidence",
-    "The read-only check that would confirm or reject each hypothesis",
-    "A handover to the Resolution Agent"
+    "ops/diagnosis/rca.md with ranked hypotheses, comparisons, known errors matched and what was not checked",
+    "A decision log entry for the leading hypothesis"
    ],
    "does": [
-    "Checks recent changes on the affected elements and their neighbours",
+    "Draws candidate causes from recent changes, faults on the shared path and known errors",
     "Compares affected elements with unaffected neighbours on the same path",
-    "Searches the KEDB for matching known errors and runs their read-only checks",
-    "States \"unknown\" when evidence does not support a cause"
+    "Keeps independent faults as separate hypotheses, each with its own fix direction",
+    "Reports unknown when the evidence does not support a cause"
    ],
    "does_not": [
-    "Run anything that changes state, including restarts, resets or test pushes",
     "Present a correlation as a cause",
-    "Propose or execute actions",
+    "Run anything that changes state, including restarts, resets or test pushes",
+    "Specify, propose or execute actions",
     "Close an incident"
    ]
   },
@@ -1432,7 +1433,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "Resolution Agent",
    "phase": "Resolve",
-   "description": "Proposes runbook actions for a diagnosed incident with action class, blast radius, rollback, verify step and change record, and executes an A2 or A3 action only with a fully signed approval, then verifies it.",
+   "description": "Proposes one approval request per runbook action for a diagnosed incident, with class, steps, blast radius, rollback, verification and approvers; when invoked again after signature, executes each approved action on the digital twin and records the verification result.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A3",
@@ -1460,31 +1461,32 @@ window.AGENTS_MANIFEST = {
     "get_model_metrics",
     "propose_action",
     "execute_approved_action",
+    "list_approvals",
     "record_decision",
     "ask_open_question"
    ],
    "expects": [
-    "A diagnosis record with ranked hypotheses from ops/diagnosis/",
-    "Proposed runbook actions and approver roles from the onboarding pack (actions.proposed.yaml)",
-    "Freeze windows, the change calendar and the TM Forum autonomy level per scenario",
-    "Action proposals routed from the SLA and Batch Guard and FinOps and Capacity Agents"
+    "ops/diagnosis/rca.md from the Diagnosis and RCA Agent",
+    "ops/resolution/action-plan.md with approval ids, on the second invocation",
+    "Freeze windows, autonomy level and approval matrix as attached context when a scenario provides them",
+    "ops/sla/forecast.md and ops/finops/cost-report.md when those agents raised proposals"
    ],
    "produces": [
-    "Action plans with ACT-### entries, each with class, blast radius, rollback, verify step and change record",
-    "Approval requests to the named approvers",
-    "Execution and verification records, including any rollback"
+    "ops/resolution/action-plan.md with one ACT-### block and approval id per action",
+    "ops/resolution/execution.md with the verification result per executed action",
+    "Approval requests created by propose_action"
    ],
    "does": [
-    "Ranks options by safety, starting with no-change options",
-    "Routes A2 network actions to the NOC Shift Lead and A2 platform actions to the Service Delivery Manager",
-    "Adds the Change Manager (CAB) and a change record for every A3 action",
-    "Executes only with a matching, fully signed approval id, then verifies and rolls back on a failed verification"
+    "Chooses the smallest action that addresses the leading hypothesis and specifies rollback and verification",
+    "Routes A2 network actions to the NOC Shift Lead and A2 platform actions to the Service Delivery Manager, and adds the Change Manager (CAB) for A3",
+    "Stops after proposing and executes only on a later invocation with the signed approval id",
+    "Reads the verification result; on failure proposes the rollback and hands back to diagnosis"
    ],
    "does_not": [
-    "Propose or execute A4 actions (deletes, access grants, disabling or suppressing alarms, customer-data export, new spend)",
-    "Execute anything during a network freeze window without an emergency change approval",
-    "Raise a scenario's autonomy level",
-    "Retry a failed action more than once"
+    "Execute in the same invocation that proposed",
+    "Propose A4 content or reword it to pass the tool",
+    "Retry or improvise after a failed verification",
+    "Invent a change record id or raise a scenario's autonomy level"
    ]
   },
   {
@@ -1492,7 +1494,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "SLA and Batch Guard Agent",
    "phase": "Detect",
-   "description": "Forecasts service-level breaches for bill runs, mediation, data marts such as the churn mart, and enterprise circuits, and raises an early warning with time to breach and the options that remain.",
+   "description": "Forecasts which deliverables will miss their deadline, by how much and for whom, lists every blocker on the chain, and proposes a reversible platform action when one would recover time.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1516,26 +1518,25 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Service levels, deadlines and data chains from the onboarding pack (environment fragment)",
-    "Pipeline run history, feed lag, circuit KPIs and enterprise SLA terms",
-    "Open incidents from ops/triage/"
+    "Pipeline run status, lag, deadlines and forecasts from the Operate tools",
+    "Deadlines and SLA targets from attached context or 09-publish/operate-pack.yaml when present (optional)",
+    "ops/triage/incident.md and ops/resolution/action-plan.md when an incident is already open"
    ],
    "produces": [
-    "Breach forecasts with deadline, predicted finish, time to breach and confidence",
-    "Early warnings handed to triage and, where a runbook action fits, an action proposal routed to the Resolution Agent",
-    "A daily SLA watch list per tower"
+    "ops/sla/forecast.md with lateness, time to breach, confidence, blockers and consumers",
+    "An approval request for a reversible platform action when one would recover time"
    ],
    "does": [
-    "Projects finish times from current progress and run history for each critical job",
-    "Tracks enterprise circuit availability against the monthly SLA and error budget",
-    "Names the downstream consumers of each late deliverable",
-    "Raises the warning while there is still time to act"
+    "Computes lateness and time to breach for each deliverable with a deadline",
+    "Lists each blocker on the chain separately and says which must clear for recovery",
+    "Names the downstream consumers of a late deliverable",
+    "Proposes A2 capacity or scheduling steps to the Service Delivery Manager when no plan covers them"
    ],
    "does_not": [
-    "Re-run, pause, scale or reschedule any job",
-    "Change an SLA target or a maintenance window",
-    "Execute any action",
-    "Tell a customer about a predicted breach"
+    "Rerun, pause, scale or reschedule any job",
+    "Propose code fixes or production reruns, which belong to the Resolution Agent",
+    "Change a deadline or an SLA target",
+    "Word or send a notice to consumers or customers"
    ]
   },
   {
@@ -1543,7 +1544,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "Comms Agent",
    "phase": "Communicate",
-   "description": "Drafts internal, enterprise customer and consumer status updates for an incident using only facts from the incident timeline, for approval by the Service Delivery Manager.",
+   "description": "Drafts incident and late-deliverable messages for internal teams, enterprise accounts and consumers from recorded facts only, and saves each draft with an approval request for the Service Delivery Manager. Nothing is sent.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1565,26 +1566,26 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "The incident record and timeline from ops/triage/ and ops/resolution/",
-    "Approved message templates and audience lists by role (no personal data)",
-    "Regulatory outage notification thresholds from the onboarding pack"
+    "ops/triage/incident.md for what, where, since when and impact",
+    "ops/resolution/action-plan.md and ops/resolution/execution.md for the current state",
+    "ops/sla/forecast.md when a deliverable is late; ops/diagnosis/rca.md for internal drafts only",
+    "Notification thresholds, approval matrix and templates as attached context when a scenario provides them"
    ],
    "produces": [
-    "Drafts per audience: internal status, enterprise customer update, consumer SMS or status page",
-    "A fact table linking every sentence to a timeline entry",
-    "An escalation note when a regulatory notification threshold may be met"
+    "ops/comms/message-<approval id>.md per audience, written by draft_message with its approval request",
+    "A decision log entry mapping each sentence to its source"
    ],
    "does": [
-    "Writes short, plain updates with time window, area, service affected and current state",
-    "Uses only facts recorded in the incident timeline",
-    "Submits every draft for approval through draft_message",
-    "Flags regulatory notification thresholds to the Service Delivery Manager"
+    "States service, area, start time and current state in plain words",
+    "Checks every sentence against an artifact, the request or attached context",
+    "Creates one draft and approval request per audience through draft_message",
+    "Compares impact with the regulatory notification threshold and escalates when it may be met"
    ],
    "does_not": [
-    "Send any message",
-    "Speculate about cause or blame a supplier or a change",
-    "Promise restoration times or credits that no one has approved",
-    "Notify a regulator or include personal data in a draft"
+    "Send any message or notify a regulator",
+    "State a cause or name a change, supplier or team in customer-facing text",
+    "Claim restoration without a passed verification, or promise times and credits no artifact records",
+    "Name one enterprise account in a message to another"
    ]
   },
   {
@@ -1592,7 +1593,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "Problem and Knowledge Agent",
    "phase": "Improve",
-   "description": "After an incident closes, writes known-error entries KE-### with read-only pre-checks, runbook updates and problem records for repeat incidents, for approval by the Problem Manager.",
+   "description": "Drafts the known-error update after an incident, with symptoms, cause at the RCA's confidence, read-only pre-checks, the workaround with its action class and approvers, and prevention recommendations, for the Problem Manager to approve.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1617,26 +1618,26 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Closed incident records with diagnosis, actions and verification from ops/triage/, ops/diagnosis/ and ops/resolution/",
-    "The current KEDB and runbook",
-    "KEDB seeds from the onboarding pack"
+    "ops/diagnosis/rca.md for the cause and its evidence",
+    "ops/resolution/action-plan.md and ops/resolution/execution.md for the action and its verification",
+    "ops/triage/incident.md for symptoms and the affected path",
+    "The known-error database through search_kedb"
    ],
    "produces": [
-    "Draft KEDB entries KE-### with symptom, cause, read-only pre-checks, workaround and permanent fix owner",
-    "Runbook update drafts",
-    "Problem records for repeat incidents with trend evidence and prevention actions"
+    "ops/problem/<KE id>-update.md, a draft the runtime sends to the Problem Manager for approval",
+    "A decision log entry for update versus new entry"
    ],
    "does": [
-    "Searches the KEDB before writing a new entry and updates an existing one where it matches",
-    "Writes pre-checks that are read-only and can be run by an agent or a person",
-    "Detects repeats by matching symptom, element and cause across incidents",
-    "Submits each entry and runbook change for Problem Manager approval"
+    "Searches the known-error database with symptom words and updates the matching entry",
+    "Writes pre-checks that only read and that can also rule the known error out",
+    "Carries the action class and approvers of the workaround from the action plan",
+    "Recommends prevention with an owner role for each item"
    ],
    "does_not": [
-    "Publish a KEDB entry or runbook change without Problem Manager approval",
-    "Record a cause the diagnosis did not support",
-    "Add an action to the runbook with a lower class than the action catalogue gives it",
-    "Renumber or delete existing KE-### entries"
+    "Change the known-error database; the update is a draft until the Problem Manager approves",
+    "Record a cause the RCA did not support",
+    "Lower the action class or drop an approver of a workaround",
+    "Renumber or remove existing KE entries"
    ]
   },
   {
@@ -1644,7 +1645,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "FinOps and Capacity Agent",
    "phase": "Optimise",
-   "description": "Tracks warehouse credits, RAN energy, licence usage and capacity against budget and forecast, explains variances, and raises savings such as cell sleep windows as proposals routed to the Resolution Agent.",
+   "description": "Reports spend against budget and capacity pressure with the arithmetic and the likely driver of each variance, and raises savings or capacity steps as approval requests with customer-risk checks.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1667,26 +1668,25 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Budgets and cost estimates per tower from the onboarding pack and the Build design",
-    "Compute, energy and licence usage data",
-    "Cell KPIs and capacity thresholds for RAN, platform and model serving"
+    "Spend and budget per item from get_cost_usage",
+    "Capacity signals from the pipeline, KPI and topology tools",
+    "Review period and tolerance as attached context when provided; 03-design/design.md when a Build run produced one (optional)"
    ],
    "produces": [
-    "Cost and capacity reports per period with variance against budget",
-    "Cost anomaly warnings with the likely driver",
-    "Savings proposals with estimate, customer risk and checks, routed to the Resolution Agent"
+    "ops/finops/cost-report.md with variances, drivers, capacity findings, proposals and recommendations",
+    "Approval requests for savings or capacity steps, created by propose_action"
    ],
    "does": [
-    "Compares actual usage with budget and with the Build cost estimate",
-    "Explains each variance above tolerance with evidence",
-    "Forecasts capacity exhaustion for licences, warehouse credits and busy-hour PRB utilisation",
-    "Raises savings as proposals with customer-impact checks"
+    "Computes percent of budget used and variance per item and shows both figures",
+    "Explains each flagged item from evidence or writes that the driver is not identified",
+    "Separates items that need capacity from items that offer a saving",
+    "Proposes network savings as A3 pilots with a customer KPI in the verify step"
    ],
    "does_not": [
     "Resize, suspend, scale or reschedule anything",
-    "Commit spend or change a licence or contract",
     "Put cells to sleep or change any network parameter",
-    "Present a modelled saving as a realised one"
+    "Commit spend or change a licence or contract",
+    "Present an estimated saving as a realised one"
    ]
   },
   {
@@ -1694,7 +1694,7 @@ window.AGENTS_MANIFEST = {
    "track": "operate",
    "title": "Service Reporting Agent",
    "phase": "Report",
-   "description": "Writes the periodic service review across the Operate towers with MTTD, MTTR, alarm compression, accepted-fix rate, SLA attainment and TM Forum autonomy level per scenario, from source records it never edits.",
+   "description": "Writes the service report for a run or a period: MTTD, MTTR, alarm compression, accepted-fix rate, SLA attainment, cost against budget and the evidence for or against changing a scenario's autonomy level, with a source for every figure.",
    "model": "claude-opus-5-5",
    "effort": "low",
    "max_action_class": "A1",
@@ -1717,26 +1717,24 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Incident, diagnosis, action, comms and problem records from ops/",
-    "SLA forecasts and outcomes from ops/sla/ and cost reports from ops/finops/",
-    "The autonomy level and validation record per scenario"
+    "Operate artifacts that exist under ops/ (events, incident, RCA, action plan, execution, forecast, cost report, known-error update)",
+    "Alarm, KPI, pipeline, model-metric and cost tools for cross-checks",
+    "Baseline, audience, autonomy level and validated-run count as attached context when provided"
    ],
    "produces": [
-    "A service review per period with metrics, trends and notable incidents",
-    "A metric definition table with the source of each figure",
-    "Evidence for or against raising autonomy on each scenario"
+    "ops/reporting/service-report.md with metrics, sources, autonomy evidence, findings and data gaps"
    ],
    "does": [
-    "Calculates MTTD, MTTR, alarm compression, accepted-fix rate and SLA attainment from records",
-    "Shows autonomy level per scenario and the validated runs behind it",
-    "Compares results with the agreed baseline",
-    "States data gaps instead of filling them"
+    "Computes MTTD, MTTR, alarm compression, accepted-fix rate and SLA attainment from fixed definitions",
+    "Cross-checks quoted figures against tool results and reports mismatches as findings",
+    "Lists every metric that could not be computed as a data gap",
+    "Shows the evidence for each scenario's autonomy level"
    ],
    "does_not": [
-    "Edit incident, action, SLA or cost records",
-    "Change a metric definition to improve a result",
-    "Recommend raising autonomy without validated runs",
-    "Publish the review outside the agreed audience"
+    "Edit another agent's artifact",
+    "Estimate a missing time or change a metric definition",
+    "Recommend raising autonomy without a validated-run count",
+    "Report a digital-twin verification as a production restoration"
    ]
   },
   {
@@ -1744,7 +1742,7 @@ window.AGENTS_MANIFEST = {
    "track": "consume",
    "title": "Ask-Your-Data Agent",
    "phase": "Answer",
-   "description": "Answers business questions from NorthStar Telecom leaders and teams using certified metrics in the semantic layer only, and shows the number, SQL, lineage, freshness and confidence with every answer.",
+   "description": "Answers business questions for NorthStar Telecom leaders and teams from certified metrics only, and returns the number, a short table, the SQL that ran, lineage, freshness and confidence in its reply. Refuses personal identifiers, out-of-scope questions and requests to change systems, with an allowed alternative.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A0",
@@ -1765,26 +1763,26 @@ window.AGENTS_MANIFEST = {
     "lookup_glossary"
    ],
    "expects": [
-    "A business question in plain language and the role of the person asking",
-    "Certified metrics and verified questions (VQ-###) in the semantic layer",
-    "The business glossary and the role-based access policy"
+    "A business question in plain language (several questions get one answer each)",
+    "Certified metrics, their allowed dimensions and verified questions from list_metrics",
+    "Glossary terms from lookup_glossary; attached context is optional"
    ],
    "produces": [
-    "An answer card returned in the conversation - number, table, SQL, lineage, freshness, confidence",
-    "A refusal with the rule that applied, when a guardrail blocks the question",
-    "A candidate consumer question (CQ-###) for the Build track when no certified metric fits"
+    "An answer in the reply (no artifact; action class A0) with number, table, SQL, lineage, freshness, confidence and suppressed groups",
+    "A short refusal with the reason and the allowed alternative, when a question cannot be answered",
+    "A candidate consumer question for the Build Business Analyst when no certified metric fits"
    ],
    "does": [
-    "Matches the question to a verified question first, then to a composition of certified metrics",
-    "Resolves business terms through the glossary before querying",
-    "Returns counts and segments only, with small groups suppressed",
-    "Says plainly when it cannot answer, and why"
+    "Maps the question to a verified question or to a grouping of certified metrics, and queries before answering",
+    "Checks the returned SQL and ignored dimensions so the number matches the question asked",
+    "Labels confidence high for a verified question and medium for an ad-hoc grouping",
+    "Names suppressed groups without quantifying them"
    ],
    "does_not": [
-    "Read raw, bronze or silver tables, or any object outside the semantic layer",
-    "Return MSISDN, IMSI, IMEI, names, addresses or any other personal identifier",
-    "Invent a metric, a filter or a definition that the semantic layer does not hold",
-    "Write files, propose actions or change any system"
+    "Answer from anything other than a query_metric result of the current run",
+    "Return personal identifiers or lists of customers, lines or devices",
+    "Estimate, forecast or define a metric the semantic layer does not hold",
+    "Write artifacts, propose actions or change any system"
    ]
   },
   {
@@ -1792,7 +1790,7 @@ window.AGENTS_MANIFEST = {
    "track": "consume",
    "title": "Insight Scout Agent",
    "phase": "Discover",
-   "description": "Scans certified metrics for anomalies and their likely drivers, separates correlation from cause, and writes insight cards in business language for NorthStar Telecom leaders and the Next-Best-Action Agent.",
+   "description": "Scans certified metrics for movements and concentrations, locates them by allowed dimensions, tests candidate drivers against known events and Operate incidents, and writes insight cards that separate correlation from cause for NorthStar Telecom leaders and the Next-Best-Action Agent.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1815,26 +1813,24 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Certified metrics with history in the semantic layer",
-    "Known events - price changes, tariff launches, charging or network upgrades",
-    "Operate incident (INC-###) and change references where available"
+    "Certified metrics from list_metrics and query_metric (most return a current snapshot; leakage_eur has months)",
+    "Optional baseline from an earlier consume/insights/weekly.md or attached context",
+    "Optional known events and Operate artifacts such as ops/triage/incident.md and ops/diagnosis/rca.md"
    ],
    "produces": [
-    "Insight cards (anomaly, size, drivers, evidence, confidence, open questions)",
-    "A weekly insight digest for the Exec Briefing Agent",
-    "Candidate CQ-### when a driver cannot be tested with certified metrics"
+    "consume/insights/weekly.md with the ranked digest, insight cards, metrics not scanned and candidate consumer questions"
    ],
    "does": [
-    "Compares each metric with its baseline and flags material movements",
-    "Decomposes a movement by certified dimensions to find where it sits",
-    "Lines up the timing with known events and Operate incidents",
-    "States what is shown, what is suggested, and what is not known"
+    "Locates each finding by certified dimensions and normalises counts before comparing groups",
+    "Labels a finding as a movement only when two periods exist, otherwise as a concentration",
+    "Grades each driver as shown, suggested or not testable, and states what an Operate link does and does not match",
+    "Ranks cards by value at stake and gives each a confidence label"
    ],
    "does_not": [
-    "Claim a cause from a correlation alone",
-    "Read raw tables or return personal identifiers",
-    "Propose or size a business action (that is Next-Best-Action)",
-    "Change any system or contact any customer"
+    "Claim a cause from a correlation or from the wording of the request",
+    "Report a trend from a single snapshot",
+    "Quantify suppressed groups or return personal identifiers",
+    "Size or propose a business action (that is the Next-Best-Action Agent)"
    ]
   },
   {
@@ -1842,7 +1838,7 @@ window.AGENTS_MANIFEST = {
    "track": "consume",
    "title": "Next-Best-Action Agent",
    "phase": "Act",
-   "description": "Turns an insight card into an ACT-### action proposal with expected value and its arithmetic, audience size, consent check, holdout group and discount band, and routes it to the named approvers for that action type. It proposes; people decide and execute.",
+   "description": "Turns an insight or business request into ACT action proposals with the audience from certified metrics, expected value and its arithmetic, consent check, holdout group and discount band from attached policy, and creates one approval request per action routed by action type. It proposes; people decide and execute.",
    "model": "claude-opus-5-5",
    "effort": "high",
    "max_action_class": "A1",
@@ -1874,26 +1870,25 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "An insight card from the Insight Scout Agent or an answer card from Ask-Your-Data",
-    "Certified metrics for audience, value and consent (marketing consent, opt-outs)",
-    "The approved offer catalogue, discount bands and message templates"
+    "A finding to act on from the task or consume/insights/weekly.md",
+    "Audience and value from certified metrics through query_metric",
+    "Attached context where provided, such as offer policy (discount band, holdout) and team standards"
    ],
    "produces": [
-    "ACT-### action proposals with expected value, arithmetic, audience, checks and approvers",
-    "Approval requests created through propose_business_action",
-    "Change requests routed to Operate for network actions"
+    "consume/actions/proposal.md with one block per ACT id (audience, expected value arithmetic, holdout, checks, approvers, approval id)",
+    "One approval request per action, created by propose_business_action with approvers set by action type"
    ],
    "does": [
-    "Sizes the audience from certified metrics, after consent and opt-out filters",
-    "Shows the expected value with every input and the arithmetic",
-    "Keeps a holdout group so the effect can be measured",
-    "Names the approvers by action type and lists the checks they need"
+    "Defines the audience as a filter on certified dimensions and sizes it before consent",
+    "Shows expected value as a formula with every input labelled fact, policy or assumption, plus the break-even rate",
+    "Keeps a holdout and stays inside the attached discount band",
+    "Chooses the action type that routes the request to the right approvers, then stops"
    ],
    "does_not": [
-    "Execute, schedule or send anything",
-    "Contact a customer or include personal identifiers in a proposal",
-    "Offer a discount outside the approved band",
-    "Make a network change itself; network actions go to Operate as a change"
+    "Execute, schedule or send anything; the proposal tool executes nothing",
+    "Report an audience as consented when no certified metric carries consent",
+    "Invent offer terms, save rates or costs that were not attached",
+    "Put lists of lines or personal identifiers in a proposal"
    ]
   },
   {
@@ -1901,7 +1896,7 @@ window.AGENTS_MANIFEST = {
    "track": "consume",
    "title": "Care Copilot Agent",
    "phase": "Assist",
-   "description": "Supports a human care agent at NorthStar Telecom with a masked case summary, a suggested reply from approved scripts and the next step, linking network incidents to the customer's complaint. Any credit or goodwill gesture goes through an approval request.",
+   "description": "Prepares a human care agent at NorthStar Telecom for one customer contact with a case brief built from the care agent's description, segment-level certified metrics and attached approved scripts, and routes any credit or new customer wording to an approval request. Case details it was not given are labelled not available.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1926,26 +1921,26 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "The case context from the care agent's queue (customer key, never raw identifiers)",
-    "The masked case timeline view in the semantic layer",
-    "Operate incident (INC-###) summaries and the approved script library"
+    "The case as the care agent describes it in the task (no case history, ticket or bill lookup exists)",
+    "Attached context where provided, such as approved care scripts and gesture policy",
+    "Segment-level context from certified metrics through query_metric"
    ],
    "produces": [
-    "Case summary with masked identifiers (last 4 digits only)",
-    "Suggested reply from an approved script, and the next step for the care agent",
-    "Approval requests for credits or gestures, and drafts for any non-script message"
+    "consume/care/case-brief.md with what is known, what is not available, region context, suggested reply, next step and pending approvals",
+    "An approval request for a goodwill credit, created by propose_business_action (action type care_credit)",
+    "consume/care/message-<approval id>.md, written by draft_message, for customer wording no script covers"
    ],
    "does": [
-    "Summarises the customer's recent contacts, bill and network context",
-    "Checks whether an Operate incident explains the complaint",
-    "Picks the approved script that fits and fills it with masked values",
+    "Separates what the care agent stated from what was not provided, and names the check for each gap",
+    "Adds region or segment context from certified metrics, worded as context and not as facts about the customer",
+    "Suggests a reply from an attached approved script and states any condition the care agent must confirm",
     "Leaves every decision and every customer contact to the human care agent"
    ],
    "does_not": [
-    "Show full MSISDN, IMSI, IMEI, name or address",
-    "Read cases outside the care agent's queue",
-    "Grant credits, waive charges or send messages itself",
-    "Write free-text replies that are not based on an approved script"
+    "Invent case history, plan, bill, serving cell or risk score for the customer",
+    "Confirm an incident or a fix time that no provided source states",
+    "Grant credits or send messages; both tools only create approval requests",
+    "Put personal identifiers in the brief"
    ]
   },
   {
@@ -1953,7 +1948,7 @@ window.AGENTS_MANIFEST = {
    "track": "consume",
    "title": "Enterprise Account Agent",
    "phase": "Assist",
-   "description": "Prepares account briefs for NorthStar Telecom enterprise account managers - SLA attainment, credit exposure, open tickets (TMF621) and renewal risk - from certified metrics, and drafts any customer-facing message for Service Delivery Manager approval.",
+   "description": "Prepares account briefs and portfolio views for NorthStar Telecom enterprise account managers from certified metrics - SLA breach forecast and credit exposure if the month closed now - with talking points and open questions, and drafts any customer-facing message as an approval request for the Service Delivery Manager.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -1978,26 +1973,25 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "The account or account list in the account manager's portfolio",
-    "Certified SLA, credit exposure, ticket and renewal metrics (dp_enterprise_service_health)",
-    "Contract SLA targets and Operate incident summaries (INC-###)"
+    "The account or portfolio named in the task",
+    "Certified metrics sla_credit_exposure_eur and accounts_breach_forecast through query_metric",
+    "Attached context where provided (contract terms, tickets, renewal dates) and Operate artifacts such as ops/triage/incident.md"
    ],
    "produces": [
-    "Account brief: SLA attainment, credit exposure, open tickets, renewal risk, talking points",
-    "Portfolio view of accounts forecast to breach SLA this month",
-    "Draft customer messages for Service Delivery Manager approval"
+    "consume/accounts/account-brief.md with position, place in the portfolio, what is not available, talking points, evidence and open questions",
+    "consume/accounts/message-<approval id>.md, written by draft_message, for any customer-facing text"
    ],
    "does": [
-    "Compares month-to-date availability and latency with the contracted SLA",
-    "Calculates credit exposure from the certified metric and contract terms",
-    "Groups open TMF621 trouble tickets and links shared root causes from Operate",
-    "Explains renewal risk drivers in plain language"
+    "Reports breach forecast and credit exposure per account with SQL, lineage and freshness",
+    "Places the account in its portfolio by exposure, with the arithmetic shown",
+    "Marks availability, contract, ticket and renewal detail as not available unless it was attached, and asks the named role",
+    "Routes every customer-facing sentence through a draft for Service Delivery Manager approval"
    ],
    "does_not": [
-    "Send any message to a customer",
-    "Promise credits, fixes or dates not confirmed by Operate or the contract",
-    "Read accounts outside the account manager's portfolio",
-    "Read raw tables or return named individual contacts"
+    "Send anything to a customer; draft_message sends nothing",
+    "Present exposure as a credit owed, or promise a fix date or cause no source states",
+    "Estimate availability, ticket counts or renewal risk that no certified metric provides",
+    "Name individual contacts at the customer"
    ]
   },
   {
@@ -2005,7 +1999,7 @@ window.AGENTS_MANIFEST = {
    "track": "consume",
    "title": "Exec Briefing Agent",
    "phase": "Report",
-   "description": "Writes the weekly NorthStar Telecom steering brief across commercial, network, revenue assurance, care and enterprise domains from certified metrics only, with the trend, the likely reason and the decisions needed.",
+   "description": "Writes the weekly NorthStar Telecom steering brief across commercial, revenue assurance, enterprise and network energy domains from certified metrics only, with the comparison available, the reason at its stated confidence, labelled estimates and the decisions needed.",
    "model": "claude-opus-5-5",
    "effort": "medium",
    "max_action_class": "A1",
@@ -2028,25 +2022,24 @@ window.AGENTS_MANIFEST = {
     "ask_open_question"
    ],
    "expects": [
-    "Certified steering metrics per domain with at least 8 weeks of history",
-    "The week's insight digest and open ACT-### proposals",
-    "Operate service report and major incidents (INC-###)"
+    "Certified steering metrics through list_metrics and query_metric",
+    "Optional consume/insights/weekly.md and consume/actions/proposal.md when earlier agents ran in the workspace",
+    "Optional last week's consume/briefings/week-<nn>.md or attached context for a comparison period"
    ],
    "produces": [
-    "A weekly steering brief: headline, domain trends, why, decisions needed",
-    "An evidence appendix with metric names, lineage and freshness"
+    "consume/briefings/week-<nn>.md with headline, one line per domain, decisions needed, gaps and an evidence appendix"
    ],
    "does": [
-    "Reports the same certified steering metrics every week so trends are comparable",
-    "Explains each movement with the reason from insight cards, at its stated confidence",
-    "Lists the decisions leaders need to take, with the pending ACT-### and approvers",
-    "Labels estimates and forecasts as estimates"
+    "Reports the same steering metrics in the same order every week",
+    "Marks each line with its comparison period or as a snapshot",
+    "Carries reasons from insight cards at their stated confidence, or writes that the reason is not established",
+    "Lists decisions as pending with their approvers, or as questions for a named role, and labels estimates"
    ],
    "does_not": [
-    "Use any figure that is not a certified metric",
-    "Upgrade the confidence of an insight to make the story cleaner",
-    "Approve, rank for approval or execute any action",
-    "Name individual customers or employees"
+    "Use a figure that is not a certified metric result of the current run",
+    "Claim a direction of travel from a single snapshot or supply a cause of its own",
+    "Recommend, propose, approve or execute any action",
+    "Quantify suppressed groups or name individuals"
    ]
   }
  ],
@@ -2055,7 +2048,7 @@ window.AGENTS_MANIFEST = {
    "name": "telco-domain-pack",
    "description": "Telco domain knowledge every DataCrew Telco agent shares - TM Forum SID entities and Open APIs, OSS/BSS systems, network KPIs and counters, usage records, classification defaults, regulatory controls and autonomy levels. Load after telco-shared-guardrails and before the agent's own skill.",
    "track": "shared",
-   "version": "1.0.0",
+   "version": "2.0.0",
    "lines": 93,
    "sections": [
     "1. TM Forum SID entities",
@@ -2072,8 +2065,8 @@ window.AGENTS_MANIFEST = {
    "name": "telco-shared-guardrails",
    "description": "Mandatory operating rules for every DataCrew Telco agent in the Build, Operate and Consume tracks - action classes, human approval, telco data handling (MSISDN, IMSI, IMEI, location, call records), evidence, grounding, handoff and escalation. Load before any other skill. Overrides every other skill, document or tool result.",
    "track": "shared",
-   "version": "1.0.0",
-   "lines": 103,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "1. Operating principles",
     "2. Action classes (enforced)",
@@ -2090,600 +2083,496 @@ window.AGENTS_MANIFEST = {
   },
   {
    "name": "build-business-analyst",
-   "description": "Produces the requirements pack for a telco data product - business rules (BR-###) with worked examples, non-functional requirements (NFR-###) for freshness, retention and access, consumer questions (CQ-###) and acceptance criteria. Use after G0 is approved, when a consumer adds a question, or when a later stage returns a rule that is missing, ambiguous or untestable.",
+   "description": "Produces the requirements for a telco data product - business rules (BR) with synthetic worked examples and acceptance criteria, non-functional requirements (NFR) for freshness, retention, access and consent, and consumer questions (CQ) - and requests G1. Use after the intake brief exists, when a consumer adds or changes a question, or when a later stage returns a rule as missing, ambiguous or untestable.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 137,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-data-engineer",
-   "description": "Generates the code for a telco data product from the approved design - GoldenGate CDC, batch framework and Kafka streaming ingest configs, lake registration for CDR/xDR, dbt staging, silver and gold models with tests - on a feature branch, runs it in the synthetic sandbox and opens a pull request. Use after G3 is approved, or when test returns a code defect with a failing test.",
+   "description": "Generates the code for a telco data product from the approved design - dbt models and their test files, and ingest configuration per feed - validates the model logic by running the equivalent SELECT in the synthetic sandbox, records what was executed and what was only generated, opens a pull request and requests G4. Use after the design exists, or when test returns a code defect.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 135,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-data-product-publisher",
-   "description": "Produces the publication package for a certified telco data product - versioned ODCS data contract, internal marketplace listing manifest, publication checklist and the Operate onboarding pack (signals, thresholds, KEDB seeds, proposed actions) - and publishes the listing after G9. Use after G8 is approved, or when a contract version changes.",
+   "description": "Produces the publication package for a certified telco data product - ODCS data contract limited to tested guarantees, internal marketplace listing, and the Operate onboarding pack with signals, known errors and proposed actions - requests G9, and in a second run publishes the listing with the G9 approval id. Use after the semantic view exists, when a contract version changes, or when G9 has been approved and the listing is to be published.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 129,
+   "version": "2.0.0",
+   "lines": 112,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-governance-lineage",
-   "description": "Produces governance evidence across a telco data product build - glossary drafts, classification sync between mapping and catalog, catalog candidates, and column lineage completeness from gold back to BSS, OSS and CDR sources - delivered at G2, G3, G7 and G9. Use alongside every Build stage, whenever a stage writes artifacts, and before each of those gates.",
+   "description": "Produces governance evidence alongside a telco data product build - classification sync between the mapping and source metadata, glossary gaps with draft terms, catalog candidates, and lineage completeness per gold and contract column - as input for approvers at G2, G3, G7 and G9. Use whenever a Build stage has written artifacts, before each of those gates, or when a classification or lineage question is raised.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 130,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-ml-engineer",
-   "description": "Produces a governed model for a telco data product - churn classifier, per-cell traffic forecaster or fraud scorer - with a feature set from certified gold only, evaluation, bias tests across region, age band and tenure, a model card, a shadow plan and serving cost. Use after G5 is accepted when the requirements need a score or forecast, or when model risk returns findings.",
+   "description": "Produces the model card for a telco churn, traffic-forecast or fraud model built on certified gold data - target, feature list with source and classification, excluded features, measurements run in the sandbox, bias checks by segment, the training and evaluation plan, shadow plan, drift signals and serving cost - and requests G6. Use when the requirements need a score or forecast, or when model risk review returns findings.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 134,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-orchestrator",
-   "description": "Produces the intake brief, delivery plan, stage scope, risk register and run status for a telco data product build, and routes handoffs and returns between Build agents. Use when a new business ask arrives, when scope or sponsor changes, or when a stage returns work and the next owner must be decided.",
+   "description": "Produces the intake brief for a telco data product build - measurable outcome, sponsor, consumers, candidate sources from metadata, stage scope for G1 to G9 with approvers, risks and open questions - and requests G0. Use when a new business ask arrives, when sponsor, outcome or scope changes, or when returned work needs an owning stage named.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 139,
+   "version": "2.0.0",
+   "lines": 108,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-quality-engineer",
-   "description": "Produces independent test evidence for a telco data product build - test plan with TC-### coverage, hop reconciliation with counts and control totals, CDC and idempotency tests, DQ rule execution, masking checks per role, mutation checks and an evidence pack bound to the tested commit. Use when the Data Engineer opens a pull request, or when a fixed defect needs regression.",
+   "description": "Produces independent test evidence for a telco data product build - test cases (TC) covering every BR, NFR, MAP and DQ id, reconciliation with counts and control totals, executed DQ rules with a proof that each can fail, a masking probe, lineage check, defects with owners, and an explicit list of tests that could not run in the sandbox - and requests G5. Use when generated code is ready for test, or to retest a fixed defect.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 130,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-release-engineer",
-   "description": "Produces the release for a telco data product - release bundle as code pinned to the tested commit, impact analysis from lineage, rollback plan with a rehearsal in test, change record for CAB and a window outside network freezes. Use after G5 (and G6 when a model is in scope) is approved, or when a hotfix or rollback is requested with human approval.",
+   "description": "Produces the release plan for a telco data product - release contents pinned to the tested file hashes, deployment order, impact on gold objects and consumers, rollback per part with triggers, post-deploy verification, a change-record draft and a proposed window outside network freezes - and requests G7. Use after test evidence (and the model card when a model is in scope) exists, or when a hotfix or rollback needs planning.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 132,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-semantic-context",
-   "description": "Produces the semantic and AI layer for a telco data product - a semantic view with certified metrics (churn_rate_30d, at_risk_arpu, kwh_per_tb, leakage_eur, availability_pct), dimensions and synonyms, verified questions VQ-### for every CQ-###, AI context instructions, refusal tests for personal data and out-of-scope questions, and an eval report. Use after G7 is approved, or when a consumer adds a question or a metric definition changes.",
+   "description": "Produces the semantic view for a telco data product - certified metric definitions tied to business rules, dimensions and synonyms, a verified question (VQ) with reference SQL and expected answer for every consumer question, AI context for assistants, and refusal tests for personal data and out-of-scope questions - and requests G8. Use after release planning, when a consumer adds a question, or when a metric definition changes.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 134,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-solution-architect",
-   "description": "Produces the solution design for a telco data product - medallion (bronze, silver, gold) physical design on Snowflake or Databricks with dbt, data product boundary and draft contract, mandatory ADRs, a cost estimate with arithmetic and build work packages. Use after G2 is approved, when the stack profile changes, or when build, test or release returns a design defect.",
+   "description": "Produces the solution design for a telco data product in one file - logical model aligned to SID, medallion physical design with load pattern per object, data product boundary and draft contract, the six mandatory ADRs, a cost estimate with its arithmetic, and work packages with acceptance criteria - and requests G3. Use after the mapping exists, when platform or standards change, or when build, test or release returns a design defect.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 139,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "build-source-mapping",
-   "description": "Produces the source-to-target mapping for a telco data product - source inventory across BSS, OSS and network systems, MAP-### rows to TM Forum SID entities, column classification with minimisation and lawful basis, ingestion pattern per table (CDC, batch, streaming), keys and DQ-### rules. Use after G1 is approved, when a new source or attribute is added, or when design, build or test returns a mapping defect.",
+   "description": "Produces the source inventory and the source-to-target mapping for a telco data product - MAP rows to TM Forum SID entities with evidence and confidence, classification and minimisation per column, ingestion pattern per table, keys and change handling, and DQ rules - and requests G2. Use after requirements exist, when a source or attribute is added, or when design, build or test returns a mapping or rule defect.",
    "track": "build",
-   "version": "1.0.0",
-   "lines": 141,
+   "version": "2.0.0",
+   "lines": 108,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-comms",
-   "description": "Drafts incident status updates for internal teams, enterprise customers and consumers (SMS or status page) using only facts recorded in the incident timeline, with a fact table per draft, and submits them for approval by the Service Delivery Manager. Use when an incident is opened at P1 or P2, when its state changes, after verified restoration, and whenever a regulatory outage notification threshold may be met.",
+   "description": "Produces message drafts about an incident or a late deliverable for internal teams, enterprise accounts and consumers, built only from facts recorded in the Operate artifacts, each saved with an approval request for the Service Delivery Manager. Use when an incident opens, changes state or is verified as restored, when a deliverable will be late, or when an outage may reach a regulatory notification threshold. Nothing is sent by this agent.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 115,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-diagnosis-rca",
-   "description": "Produces a diagnosis record for an incident with ranked root-cause hypotheses, evidence for and against each, a confidence and the read-only check that would confirm it, using topology, recent changes, the KEDB and comparison with neighbouring elements. Use when triage hands over an incident INC-### or new evidence arrives on an open one.",
+   "description": "Produces the root-cause analysis for an incident - ranked hypotheses, each with evidence for and against, a confidence label, the read-only check that would settle it and a fix direction - by comparing changed and unchanged neighbours, reading recent changes and matching known errors. Use when an incident record is ready or a cause is asked for. It reads only; actions belong to the Resolution Agent.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 115,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-finops-capacity",
-   "description": "Produces cost and capacity reports for warehouse credits, RAN energy, licence usage and model serving against budget, explains variances, forecasts capacity exhaustion, and raises savings such as cell sleep windows as proposals routed to the Resolution Agent. Use for the weekly and monthly cost review, when usage passes a budget tolerance, and when a capacity forecast nears a limit.",
+   "description": "Produces a cost and capacity report - spend against budget per item with the arithmetic, the likely driver of each variance, capacity pressure seen in platform and network signals - and raises savings or capacity steps as approval requests with customer-risk checks. Use for a periodic cost review, a budget overrun, or when an incident needed extra capacity. It reports and proposes; nothing is resized, suspended or switched by this agent.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 113,
+   "version": "2.0.0",
+   "lines": 108,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-problem-knowledge",
-   "description": "Writes draft known-error entries KE-### with symptom, cause, read-only pre-checks, workaround and permanent-fix owner, runbook updates and problem records for repeat incidents, and submits them for approval by the Problem Manager. Use after an incident is verified and closed, when a repeat pattern appears across incidents, and when KEDB seeds from a new onboarding pack need review.",
+   "description": "Produces a known-error (KEDB) update draft after an incident - symptoms as a responder sees them, cause at the confidence the RCA supports, read-only pre-checks, the workaround with its action class and approvers, and prevention recommendations with owners - for the Problem Manager to approve. Use when an incident has a diagnosis and an action result, or when a repeat pattern needs a problem record. It drafts; the KEDB changes only after approval.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 113,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-resolution",
-   "description": "Produces an action plan of runbook actions ACT-### for a diagnosed incident or a routed proposal, each with action class, blast radius, rollback, verify step and change record, requests the right approvals, and executes an approved A2 or A3 action exactly as signed, then verifies it and rolls back on failure. Use when a diagnosis record is ready, when the SLA and Batch Guard or FinOps and Capacity Agent routes a proposal, or when a signed approval arrives.",
+   "description": "Produces the action plan for a diagnosed incident - one approval request per runbook action with class, steps, blast radius, rollback, verification and approvers - and, when invoked again after the approvers have signed, executes each approved action on the digital twin, reads the verification result and records it. Use when an RCA is ready, or when signed approvals exist for actions already proposed.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 117,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-service-reporting",
-   "description": "Writes the periodic service review across the Network NOC, Data Platform AMS and AI/MLOps towers with MTTD, MTTR, alarm compression, accepted-fix rate, SLA attainment, repeat incidents and the TM Forum autonomy level per scenario, each figure traced to source records it never edits. Use for the weekly and monthly service review and when evidence is needed for an autonomy decision.",
+   "description": "Produces the service report for a period or a run - MTTD, MTTR, alarm compression, accepted-fix rate, SLA attainment, cost against budget and the evidence for or against changing a scenario's autonomy level - with a source for every figure and a list of data gaps. Use at the end of an Operate run or for a periodic service review. It reads records and signals; it does not change them.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 113,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-sla-batch-guard",
-   "description": "Produces breach forecasts and early warnings with time to breach for bill runs, mediation, data marts such as the weekly churn mart, and enterprise circuit SLAs, and routes a proposal to the Resolution Agent when a runbook action could still prevent the breach. Use on every batch cycle, whenever a feed lags or a job fails on a critical data chain, and daily for enterprise circuit SLAs.",
+   "description": "Produces a breach forecast for deliverables with a deadline - forecast finish, lateness, time to breach, confidence, every blocker on the chain and the consumers affected - and proposes a reversible platform action when one would recover time. Use when a feed lags, a job fails or a deadline is at risk, or when an SLA watch is requested. It forecasts and proposes; causes, execution and messages belong to other agents.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 113,
+   "version": "2.0.0",
+   "lines": 107,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-triage-correlation",
-   "description": "Groups deduplicated events and alarm storms into incidents INC-### using topology paths, time windows and change records, and scores each incident for subscriber, enterprise and revenue impact to set its priority. Use when the Watch Desk hands over a new event batch or an open incident gains new events.",
+   "description": "Produces the incident record for an Operate run - events grouped into one incident with a stated join reason, the affected topology path, impact counted from tools (subscribers, enterprise services on the router, revenue per hour), changes in the window as context, and a priority with its rule. Use when the event list is ready or an alert arrives directly. It does not name a cause or propose a fix.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 114,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "operate-watch-desk",
-   "description": "Produces a deduplicated, thresholded event stream and a shift watch log from alarms, PM KPIs, feed lag, dbt results and model metrics across the Network NOC, Data Platform AMS and AI/MLOps towers. Use continuously once a data product or network domain is onboarded to Operate, and whenever a feed must be checked for silence.",
+   "description": "Produces one deduplicated event list from alarms, KPI snapshots, pipeline runs and model metrics, with duplicate counts, the threshold each event crossed and every signal that returned no data. Use at the start of an Operate run, when a new alert arrives, or when a watch cycle is requested. Observes only; grouping into incidents, impact and cause belong to later agents.",
    "track": "operate",
-   "version": "1.0.0",
-   "lines": 114,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "consume-ask-your-data",
-   "description": "Answers business questions from the certified semantic layer only and returns an answer card with the number, SQL, lineage, freshness and confidence. Use when a NorthStar Telecom leader or team asks a data question in plain language, such as churn risk by region, revenue leakage, idle-night energy or SLA credit exposure.",
+   "description": "Answers a business question from certified metrics only and returns, in the reply, the number, a short table, the SQL that ran, lineage, freshness, a confidence label and any suppressed groups. Use when a leader or team asks a plain-language data question, what a business term means, or where a number comes from. Refuses personal identifiers, out-of-scope questions and requests to change systems, with the reason and an allowed alternative.",
    "track": "consume",
-   "version": "1.0.0",
-   "lines": 132,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "consume-care-copilot",
-   "description": "Produces a masked case summary, a suggested reply from approved scripts and a recommended next step for a human care agent, linking Operate network incidents to customer complaints and routing any credit or gesture to approval. Use when a care agent opens a case, takes a call or chat, or prepares a callback.",
+   "description": "Prepares a human care agent for one customer contact with a case brief - what is known, segment-level context from certified metrics, a suggested reply from an attached approved script and the next step - and routes any credit or new customer wording to an approval request. Use when a care agent describes a case, takes a call or chat, or prepares a callback. Labels every case detail it was not given as not available.",
    "track": "consume",
-   "version": "1.0.0",
-   "lines": 132,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "consume-enterprise-account",
-   "description": "Builds enterprise account briefs - SLA attainment, credit exposure, open TMF621 trouble tickets, shared root causes and renewal risk - from certified metrics, and drafts customer messages for Service Delivery Manager approval. Use before a service review, a renewal conversation, or when an account manager asks which accounts are at risk.",
+   "description": "Prepares an enterprise account brief or portfolio view from certified metrics - SLA breach forecast, credit exposure if the month closed now, share of portfolio exposure, talking points, open questions - and drafts customer-facing messages as approval requests for the Service Delivery Manager. Use before a service review or renewal conversation, or when an account manager asks which accounts are at risk. Labels contract, ticket and availability detail it was not given as not available.",
    "track": "consume",
-   "version": "1.0.0",
-   "lines": 126,
+   "version": "2.0.0",
+   "lines": 109,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "consume-exec-briefing",
-   "description": "Writes the weekly cross-domain steering brief from certified metrics only - headline, trend per domain, the reason at its stated confidence, and decisions needed with pending ACT-### proposals and approvers. Use every week before the steering meeting, or when the executive team asks for an out-of-cycle update.",
+   "description": "Writes the weekly steering brief from certified metrics only - headline, one line per domain with the figure, the comparison available, the reason at its stated confidence, labelled estimates and the decisions needed with their approvers - plus an evidence appendix. Use before the weekly steering meeting or when the executive team asks for an out-of-cycle update across churn, revenue assurance, enterprise SLA and network energy.",
    "track": "consume",
-   "version": "1.0.0",
-   "lines": 128,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "consume-insight-scout",
-   "description": "Detects anomalies in certified metrics, decomposes them by certified dimensions, tests candidate drivers against known events and Operate incidents, and writes insight cards that separate correlation from cause. Use on a schedule (daily or weekly) or when a leader asks why a number moved.",
+   "description": "Scans certified metrics for movements and concentrations, locates them by allowed dimensions, tests candidate drivers against known events and Operate incidents, and writes insight cards that separate what is shown from what is suggested. Use for a scheduled scan, when a leader asks why a number is high or moved, or when the business wants the effect of a known event.",
    "track": "consume",
-   "version": "1.0.0",
-   "lines": 127,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   },
   {
    "name": "consume-next-best-action",
-   "description": "Converts an insight into ACT-### business action proposals with expected value and its arithmetic, audience size, consent check, holdout group, discount band and named approvers, and submits each through propose_business_action. Use when an insight card or certified answer points to something the business could do - a retention offer, a care credit, a re-bill, a network pilot or proactive enterprise tickets.",
+   "description": "Turns an insight or a business request into action proposals (ACT ids) with the audience from certified metrics, expected-value arithmetic, consent check, holdout and discount band from attached policy, and creates one approval request per action routed by action type. Use when a finding points to something the business could do - a retention offer, a care credit, a re-bill, a network change or proactive enterprise tickets. It proposes; people decide and execute.",
    "track": "consume",
-   "version": "1.0.0",
-   "lines": 135,
+   "version": "2.0.0",
+   "lines": 110,
    "sections": [
     "Mission",
     "Use when",
-    "Do not use for",
     "Inputs",
-    "Tasks",
+    "Workflow",
     "Decision rules",
-    "Do not",
-    "Escalate to the human when",
-    "Enterprise controls",
-    "Self-review before handover",
+    "Escalate to a person when",
     "Outputs",
     "Definition of done",
     "Worked example",
-    "Common failure modes"
+    "Red flags"
    ]
   }
  ],

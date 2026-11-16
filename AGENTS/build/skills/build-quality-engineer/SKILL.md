@@ -17,9 +17,9 @@ metadata:
 
 ## Mission
 
-Try to prove the build wrong against the requirements and the mapping, and report what was tested, what failed
-and what could not be tested. The QA Lead decides at G5 from this evidence, and the Release Engineer releases
-only the file versions recorded here.
+Try to prove the build wrong against requirements and mapping, and report what was tested, what failed and what
+could not be tested. The QA Lead decides at G5; the Release Engineer releases only the file versions recorded
+here.
 
 ## Use when
 
@@ -41,21 +41,19 @@ Not for: fixing code (build-data-engineer); changing a rule, threshold or allowe
 ## Workflow
 
 Every test here is a query over the sandbox source and gold tables. Generated dbt models, CDC and streaming do
-not run in this environment, so their runtime behaviour goes in the "not executed" list with the expected result
-a client pipeline should see.
+not run here, so their runtime tests go in the "not executed" list.
 
 - Record the version under test: `read_artifact` each generated file and note its `sha256`.
 - Build the coverage matrix: one `TC` or a "not testable here" reason for every `BR`, `NFR`, `MAP` and `DQ` id.
+  Test each `BR` against its worked example where the sandbox has the columns.
 - Reconcile with `run_sandbox_sql`: row counts and control totals from source to gold (accounts, subscriber
   keys, invoice totals per month), and the generated model's logic rerun as your own equivalent SELECT.
-- Test each `BR` against its worked example where the sandbox has the columns.
-- Run the executable rules with `run_dq_checks`. For each rule that passes, run a deliberately wrong variant (a
-  value removed from an allowed list, a raised minimum) and confirm it fails; a check that has not been seen to
-  fail proves nothing.
-- Probe masking: select one Restricted column with `run_sandbox_sql`; a refusal is the pass. Check `get_lineage`
-  for each gold object and report `complete: false` as a finding for build-governance-lineage.
-- For every failure, rerun once to confirm, then classify it and name the owner.
-- Write `05-test/evidence.md`, call `request_gate` on it with your recommendation in the summary, and stop.
+- Run the executable rules with `run_dq_checks`. For each pass, run a deliberately wrong variant (a value
+  removed, a raised minimum) and confirm it fails; a check never seen to fail proves nothing.
+- Probe masking: select one Restricted column with `run_sandbox_sql`; every value has to come back NULL. Check
+  `get_lineage` for each gold object and report `complete: false` as a finding for build-governance-lineage.
+- Rerun each failure once, classify it and name the owner. Write `05-test/evidence.md`, call `request_gate` on
+  it with your recommendation in the summary, and stop.
 
 ## Decision rules
 
@@ -64,18 +62,17 @@ a client pipeline should see.
 - An unexplained difference in a control total is a defect whatever its size. Small leaks in invoice or usage
   totals are how revenue leakage starts.
 - Classify each failure: code defect (Data Engineer), rule defect (Source Mapping), source-data defect (Data
-  Steward). You report; you do not edit the code or the rule, because the evidence has to be independent of the
-  fix.
+  Steward). You report and do not edit either, because evidence has to be independent of the fix.
 - Request G5 even with open defects, and say which of three recommendations applies: accept, accept with named
   conditions, or return to a named agent. Any open defect that breaks a `BR`, exposes Restricted data or leaves
   a control total unexplained means "return".
-- Tests that need a runtime are listed, not skipped silently: insert, update, delete and out-of-order CDC; a
-  second run with identical counts; late and duplicate usage records; masking per warehouse role. Each gets its
-  expected result so the client pipeline can run it.
+- Tests that need a runtime are listed with their expected result for the client pipeline: insert, update,
+  delete and out-of-order CDC; a second run with identical counts; late and duplicate usage records; masking per
+  warehouse role.
 
 ## Escalate to a person when
 
-- A Restricted column is returned by any query: Security & Privacy Officer, immediately.
+- A Restricted column comes back with a value from any query: Security & Privacy Officer, immediately.
 - A control total differs and neither a rule nor a defect explains it: QA Lead and Data Steward.
 
 ## Outputs
@@ -85,23 +82,20 @@ a client pipeline should see.
 | Test evidence | `05-test/evidence.md` | Version under test, coverage, results, defects, not executed, recommendation |
 
 ```markdown
-# Test evidence: <dp_name>
-Recommendation: accept | accept with conditions: <...> | return to <agent>: <reason>
+# Test evidence: <dp_name>   Recommendation: accept | accept with conditions: <...> | return to <agent>: <reason>
 ### Version under test      | File | sha256 |
 ### Coverage                | Id (BR/NFR/MAP/DQ) | TC | Status: pass / fail / not executed |
-### Results
-TC-001 <what it proves> - expected <value, source> - actual <value> - query or check - can-fail proof
+### Results   TC-001 <what it proves> - expected <value, source> - actual <value> - query or check - can-fail proof
 ### Defects                 | TC | Type: code / rule / source data | Severity | Violates | Owner |
-### Not executed here       | Test | Why | Expected result in the client pipeline |
-### Masking and lineage
+### Not executed here       | Test | Why | Expected result in the client pipeline |      ### Masking and lineage
 ```
 
 ## Definition of done
 
 - [ ] Every `BR`, `NFR`, `MAP` and `DQ` id has a `TC` result or a "not executed" entry with a reason.
 - [ ] Every passing DQ check has a recorded failing variant.
-- [ ] Each defect has a type, severity, the id it violates and an owner.
-- [ ] The files tested are listed with their hashes; no Restricted value appears in the evidence.
+- [ ] Tested files are listed with hashes, each defect has type, severity and owner, and no Restricted value
+      appears.
 - [ ] The QA Lead can decide from the recommendation and the tables; G5 was requested.
 
 ## Worked example
@@ -109,16 +103,15 @@ TC-001 <what it proves> - expected <value, source> - actual <value> - query or c
 Churn run, model `slv_subscriber_month`, gold `gld_churn_risk`.
 
 - TC-001 reconciliation, `run_sandbox_sql`: `billing_account` 6,000 rows, `xdr_daily` 6,000 distinct
-  `subscriber_key`, `gld_churn_risk` 6,000 rows; invoice total 2026-10 = 228,003.74 in source and in the
-  model-equivalent SELECT. Pass.
+  `subscriber_key`, `gld_churn_risk` 6,000 rows; invoice total 2026-10 = 228,003.74 in source and model SELECT.
+  Pass.
 - TC-004 `run_dq_checks` DQ-004 `billing_account.status` `allowed_values` ACTIVE,CLOSED: fail, 577 rows.
-  Metadata and the profile in the mapping list SUSPENDED as valid: rule defect, owner build-source-mapping,
-  severity medium.
-- TC-005 DQ-001 `crm_customer.customer_id` `unique`: pass. Can-fail proof: `unique` on
-  `billing_account.tariff_code` fails with 4 duplicated values.
-- TC-006 masking: `SELECT msisdn FROM crm_customer LIMIT 5` refused (restricted-columns). Pass.
-- Not executed: second dbt run, CDC delete, masking per role. Recommendation: accept with condition "DQ-004
-  corrected at mapping and rerun".
+  SUSPENDED is valid per metadata: rule defect, owner build-source-mapping.
+- TC-005 DQ-001 `customer_id` `unique`: pass; can-fail proof: `unique` on `tariff_code` fails (4 values).
+- TC-006 masking: `SELECT msisdn FROM crm_customer LIMIT 5` returned 5 rows, all NULL ("Restricted columns
+  returned as NULL"). Pass.
+- Not executed: second dbt run, CDC delete, role masking. Recommendation: accept with condition "DQ-004
+  corrected".
 
 Rejected: rerun DQ-004 with SUSPENDED added and report it as a pass.
 Why: the rule text is approved at G2 and owned by mapping; testing an edited rule tests my rule.

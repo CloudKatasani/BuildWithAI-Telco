@@ -18,14 +18,12 @@ metadata:
 ## Mission
 
 Show where every required attribute comes from, which SID entity it belongs to, how sensitive it is and how it
-arrives, with evidence from metadata and profiles. The Data Steward and the Security & Privacy Officer approve
-at G2; design, build and test all work from these two files.
+arrives, with evidence. Approved at G2 by the Data Steward and the Security & Privacy Officer.
 
 ## Use when
 
 - Requirements exist and need sources, classification and quality rules.
-- A source system, table or attribute is added or renamed.
-- A later stage returns a mapping row or a DQ rule as wrong.
+- A source, table or attribute is added or renamed, or a later stage returns a mapping row or DQ rule as wrong.
 
 Not for: defining rules or thresholds (build-business-analyst); physical tables, load patterns in the target or
 cost (build-solution-architect); catalog and lineage evidence (build-governance-lineage).
@@ -42,10 +40,10 @@ cost (build-solution-architect); catalog and lineage evidence (build-governance-
 
 ## Workflow
 
-- Inventory with `list_source_metadata`: one line per column of every table in scope, including columns you
-  decide not to use, so approvers see what was left out and why.
-- Profile key, join and rule-bearing columns with `profile_column`. For Restricted columns the tool returns
-  counts and lengths only; that is enough for key and completeness evidence.
+- Inventory with `list_source_metadata`: one line per column of every table in scope, including unused columns,
+  so approvers see what was left out.
+- Profile key, join and rule-bearing columns with `profile_column`. Restricted columns return counts and lengths
+  only, which is enough for key and completeness evidence.
 - Write one `MAP` row per target attribute (check terms with `lookup_glossary`), the keys and change handling
   per table, the class and minimisation of every column, the ingestion pattern per table, and the `DQ` rules,
   each tied to the `BR` or `NFR` it protects.
@@ -65,20 +63,17 @@ cost (build-solution-architect); catalog and lineage evidence (build-governance-
   subscriber's location) and Internal in `pm_cell_kpi` (a network element).
 - Each Restricted column gets one of keep, pseudonymise, truncate (cell to cluster), aggregate or drop, with the
   requirement that justifies anything other than drop. Subscriber joins use the pseudonymous key (TEL-C4).
-- Take the ingestion pattern from metadata and state the latency need; a different pattern is a proposal with a
-  reason for the Solution Architect.
-- Usage records: map event time and arrival time separately, name the dedupe key, and say what a late record and
-  a source delete mean in the target. PM counters keep their granularity period.
+- Take the ingestion pattern from metadata and state the latency need; a different pattern is a proposal for the
+  Solution Architect. For usage records, map event time and arrival time separately, name the dedupe key, and
+  say what a late record and a source delete mean in the target. PM counters keep their granularity period.
 - Write `DQ` rules so they can be executed. The DQ runner supports `not_null`, `unique`, `min_value` and
   `allowed_values`; anything else is written as a plain-language check for sandbox SQL. Build `allowed_values`
   lists from the metadata description and the profiled values together.
-- A column renamed at source is mapped under its current name with the old name and the release note id
-  recorded, so an unannounced rename can be traced later.
+- A renamed source column is mapped under its current name, with the old name and release note id noted.
 
 ## Escalate to a person when
 
-- A requirement needs a Restricted column kept in clear, or location below cluster level: Security & Privacy
-  Officer, blocking for that row.
+- A requirement needs a Restricted column in clear or location below cluster level: Security & Privacy Officer.
 - Source history is shorter than a requirement needs, or longer than TEL-C2 allows: Security & Privacy Officer.
 
 ## Outputs
@@ -91,18 +86,15 @@ cost (build-solution-architect); catalog and lineage evidence (build-governance-
 ```markdown
 ### Mapping rows
 | ID | Target attribute | SID entity (TMF API) | Source system.table.column | Rule type | Transformation | Null handling | BR/NFR | Class | Confidence | Evidence |
-### Keys and change handling
-| Table | Business key | Joins to | Ingestion | Late / duplicate / delete handling |
-### DQ rules
-| ID | Table.column | Check | Value | Severity (block / warn) | Protects | Threshold source |
+### Keys and change handling   | Table | Business key | Joins to | Ingestion | Late / duplicate / delete handling |
+### DQ rules   | ID | Table.column | Check | Value | Severity (block / warn) | Protects | Threshold source |
 ### Gaps and options / Decisions for approvers
 ```
 
 ## Definition of done
 
 - [ ] Every attribute a `BR` or `CQ` needs has a `MAP` row or a gap with options and an owner.
-- [ ] Every `MAP` row cites a metadata or profile result; no row rests on a column name alone above `low`
-      confidence.
+- [ ] Every `MAP` row cites a metadata or profile result; name-only matches are `low` confidence.
 - [ ] Every column in scope has a class and a minimisation decision; no Restricted value appears.
 - [ ] The Solution Architect can design from the two files without opening a source; G2 was requested on both.
 
@@ -114,14 +106,13 @@ Churn run, requirements BR-001 to BR-003.
   described as ACTIVE, SUSPENDED, CLOSED; ingestion CDC (GoldenGate).
 - `profile_column` `billing_account.status`: 6,000 rows, null rate 0, top values ACTIVE 5,423, SUSPENDED
   577. `profile_column` `crm_customer.msisdn`: Restricted, 6,000 distinct, length 17, no values returned.
-- MAP-001 `tariff_code` from `billing.billing_account.tariff_code`, direct, ProductOffering (TMF620), medium;
+- MAP-002 `tariff_code` from `billing.billing_account.tariff_code`, direct, ProductOffering (TMF620), medium;
   note "was plan_code before RN-772".
 - `msisdn`, `full_name`, `date_of_birth`: drop (no rule needs them). `xdr_daily.cell_id`: drop.
 - DQ-004 `billing_account.status` `allowed_values` ACTIVE,SUSPENDED,CLOSED, block, protects BR-002.
 
 Rejected: DQ-004 with ACTIVE,CLOSED only, because BR-001 talks about active and closed lines.
-Why: the profile shows 577 SUSPENDED rows and metadata lists it as valid; the rule would fail on good data and
-be returned from test as a rule defect.
+Why: the profile shows 577 SUSPENDED rows and metadata lists it as valid; the rule would fail on good data.
 
 ## Red flags
 

@@ -124,7 +124,7 @@ def data_engineer(task: str, call: Call, s: Session) -> str:
     sc = _build_scenario(task)
     call("read_artifact", {"path": "03-design/design.md"})
     model = (f"-- models/silver/slv_subscriber_month.sql (generated)\n{{{{ config(materialized='incremental', unique_key='subscriber_key') }}}}\n"
-             "select a.account_id, a.tariff_code as plan_code, i.bill_month, sum(i.total_amount) as billed_eur\n"
+             "select a.account_id, a.tariff_code, i.bill_month, sum(i.total_amount) as billed_eur\n"
              "from {{ source('bronze','billing_invoice') }} i join {{ source('bronze','billing_account') }} a using (account_id)\n"
              "group by 1,2,3\n")
     tests = "version: 2\nmodels:\n  - name: slv_subscriber_month\n    columns:\n      - name: account_id\n        tests: [not_null]\n"
