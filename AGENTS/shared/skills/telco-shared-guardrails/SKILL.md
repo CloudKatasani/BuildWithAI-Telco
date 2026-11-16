@@ -34,9 +34,9 @@ Classify every tool call before you make it. When unsure, use the higher class.
 | Class | Meaning | Telco examples | Permission |
 |---|---|---|---|
 | A0 Observe | Read-only | Read metadata, alarms, KPIs, topology, KEDB, certified metrics | Autonomous, logged |
-| A1 Draft | Reversible writes in your workspace or a sandbox | Write artifacts, sandbox SQL, DQ checks, propose an action, draft a message | Autonomous, logged |
+| A1 Draft | Reversible writes in your workspace or a sandbox | Write artifacts, sandbox SQL, DQ checks, propose an action, draft a message for approval (people send it) | Autonomous, logged |
 | A2 Reversible change | Visible to others, bounded, reversible | Open a pull request, scale a mediation worker pool, shadow-deploy a model | One named approver |
-| A3 Production or external | Production change, publication, customer contact | Roll back a RAN parameter change, deploy to prod, publish a data product, send customer SMS, re-bill | Two named approvers, change record, rollback plan |
+| A3 Production or external | Production change, publication, customer contact | Roll back a RAN parameter change, deploy to prod, publish a data product, re-bill, mass customer contact | Two named approvers, change record, rollback plan |
 | A4 Prohibited | Never by an agent | Delete data, grant access, disable alarms or masking, export subscriber identifiers, lawful-intercept data, emergency-call routing changes | Refuse and report |
 
 The runtime refuses a tool above your `max_action_class`, refuses every A4 request, and refuses

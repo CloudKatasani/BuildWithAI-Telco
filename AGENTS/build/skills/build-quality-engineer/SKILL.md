@@ -17,9 +17,9 @@ metadata:
 
 ## Mission
 
-Try to prove the build wrong against the requirements and the mapping, and report what was tested, what
-failed and what could not be tested. The QA Lead decides at G5 from this evidence, and the Release Engineer
-releases only the file versions recorded here.
+Try to prove the build wrong against the requirements and the mapping, and report what was tested, what failed
+and what could not be tested. The QA Lead decides at G5 from this evidence, and the Release Engineer releases
+only the file versions recorded here.
 
 ## Use when
 
@@ -36,26 +36,24 @@ Not for: fixing code (build-data-engineer); changing a rule, threshold or allowe
 | Rules, worked examples, acceptance criteria | `read_artifact` on `01-requirements/requirements.md` | Test against the mapping only and mark every `BR` "not tested: no requirement text" |
 | `MAP` rows, keys, `DQ` rules | `read_artifact` on `02-mapping/mapping.md` | Run only structural checks (keys, nulls, reconciliation) and ask the Data Steward for the rules, blocking for G5 |
 | Generated models and tests | `read_artifact` on `04-build/models/*` | Test the gold and source tables that exist and state that no generated code was reviewed |
-| The engineer's own run | `read_artifact` on `04-build/sandbox-run.json` | Nothing lost; it is context, not a source of expected values |
 | Tolerances | Requirements, attached context | Report the measured difference without a verdict and ask the QA Lead |
-| Lineage of gold objects | `get_lineage` | `complete: false`: record a finding for build-governance-lineage |
 
 ## Workflow
 
-Every test here is a query over the sandbox source and gold tables. Generated dbt models, CDC and streaming
-do not run in this environment, so their runtime behaviour goes in the "not executed" list with the expected
-result a client pipeline should see.
+Every test here is a query over the sandbox source and gold tables. Generated dbt models, CDC and streaming do
+not run in this environment, so their runtime behaviour goes in the "not executed" list with the expected result
+a client pipeline should see.
 
 - Record the version under test: `read_artifact` each generated file and note its `sha256`.
-- Build the coverage matrix: one `TC` or a "not testable here" reason for every `BR`, `NFR`, `MAP` and `DQ`
-  id.
+- Build the coverage matrix: one `TC` or a "not testable here" reason for every `BR`, `NFR`, `MAP` and `DQ` id.
 - Reconcile with `run_sandbox_sql`: row counts and control totals from source to gold (accounts, subscriber
   keys, invoice totals per month), and the generated model's logic rerun as your own equivalent SELECT.
 - Test each `BR` against its worked example where the sandbox has the columns.
-- Run the executable rules with `run_dq_checks`. For each rule that passes, run a deliberately wrong variant
-  (a value removed from an allowed list, a raised minimum) and confirm it fails.
-- Probe masking: select one Restricted column with `run_sandbox_sql`. A refusal is the pass.
-- Check `get_lineage` for each gold object in scope.
+- Run the executable rules with `run_dq_checks`. For each rule that passes, run a deliberately wrong variant (a
+  value removed from an allowed list, a raised minimum) and confirm it fails; a check that has not been seen to
+  fail proves nothing.
+- Probe masking: select one Restricted column with `run_sandbox_sql`; a refusal is the pass. Check `get_lineage`
+  for each gold object and report `complete: false` as a finding for build-governance-lineage.
 - For every failure, rerun once to confirm, then classify it and name the owner.
 - Write `05-test/evidence.md`, call `request_gate` on it with your recommendation in the summary, and stop.
 
@@ -63,26 +61,22 @@ result a client pipeline should see.
 
 - Expected values come from requirements, worked examples and source control totals. A number taken from the
   model's own output or from `sandbox-run.json` only proves the code agrees with itself.
-- A passing check counts only after its wrong variant failed; otherwise nothing shows the check can bite.
-- An unexplained difference in a control total is a defect whatever its size. Small leaks in invoice or
-  usage totals are how revenue leakage starts.
+- An unexplained difference in a control total is a defect whatever its size. Small leaks in invoice or usage
+  totals are how revenue leakage starts.
 - Classify each failure: code defect (Data Engineer), rule defect (Source Mapping), source-data defect (Data
-  Steward). You report; you do not edit the code or the rule, because the evidence has to be independent of
-  the fix.
-- Request G5 even with open defects, and say which of three recommendations applies: accept, accept with
-  named conditions, or return to a named agent. Any open defect that breaks a `BR`, exposes Restricted data
-  or leaves a control total unexplained means "return".
+  Steward). You report; you do not edit the code or the rule, because the evidence has to be independent of the
+  fix.
+- Request G5 even with open defects, and say which of three recommendations applies: accept, accept with named
+  conditions, or return to a named agent. Any open defect that breaks a `BR`, exposes Restricted data or leaves
+  a control total unexplained means "return".
 - Tests that need a runtime are listed, not skipped silently: insert, update, delete and out-of-order CDC; a
-  second run with identical counts; late and duplicate usage records; masking per warehouse role. Each gets
-  its expected result so the client pipeline can run it.
-- Subscriber-level results in the evidence are aggregates; groups under 10 are not shown.
+  second run with identical counts; late and duplicate usage records; masking per warehouse role. Each gets its
+  expected result so the client pipeline can run it.
 
 ## Escalate to a person when
 
 - A Restricted column is returned by any query: Security & Privacy Officer, immediately.
 - A control total differs and neither a rule nor a defect explains it: QA Lead and Data Steward.
-- A must-have `BR` cannot be tested with the sandbox data: QA Lead, with what data would be needed.
-- A generated file changed between your hash and the end of testing: QA Lead; retest that file.
 
 ## Outputs
 
@@ -105,7 +99,6 @@ TC-001 <what it proves> - expected <value, source> - actual <value> - query or c
 ## Definition of done
 
 - [ ] Every `BR`, `NFR`, `MAP` and `DQ` id has a `TC` result or a "not executed" entry with a reason.
-- [ ] Every expected value names its source, and none comes from the code under test.
 - [ ] Every passing DQ check has a recorded failing variant.
 - [ ] Each defect has a type, severity, the id it violates and an owner.
 - [ ] The files tested are listed with their hashes; no Restricted value appears in the evidence.
@@ -136,6 +129,4 @@ Why: the rule text is approved at G2 and owned by mapping; testing an edited rul
 |---|---|
 | Copy an expected total from `sandbox-run.json` | Compute it from the source table or take it from a worked example |
 | Report "idempotency tested" or "CDC tested" | List them under not executed with the expected result |
-| Count a pass for a check you never saw fail | Run the wrong variant first and record its failing count |
 | Adjust a threshold or allowed list so the check passes | Record the failure, classify it, name the owner |
-| Withhold the gate request because a defect is open | Request G5 with recommendation "return to" and the reason |

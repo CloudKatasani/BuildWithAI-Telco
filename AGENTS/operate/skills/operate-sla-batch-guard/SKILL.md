@@ -80,10 +80,10 @@ consumers (Comms Agent); the cost of extra capacity (FinOps and Capacity Agent).
 ```
 # SLA forecast at <time>
 | Deliverable | Deadline | Forecast finish | Late by | Time to breach | Confidence | Consumers |
-## Blockers
+### Blockers
 | Blocker | Evidence | Clears when | Who acts |
-## Recovery window: <latest time the fix can land and still meet the deadline, or "not known">
-## Proposals and handover
+### Recovery window: <latest time the fix can land and still meet the deadline, or "not known">
+### Proposals and handover
 ```
 
 ## Definition of done

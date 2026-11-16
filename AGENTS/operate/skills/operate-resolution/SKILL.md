@@ -33,7 +33,7 @@ known-error entry (Problem and Knowledge Agent); writing the hotfix code (people
 | Input | Where it comes from | If it is missing |
 |---|---|---|
 | Leading hypothesis, fix direction | `ops/diagnosis/rca.md` through `read_artifact`; known fix from `search_kedb` | Form a minimal hypothesis from `get_recent_changes`, `search_kedb` and `get_kpis`, head the plan "no RCA artifact", and propose a change only if it reaches `medium`; otherwise ask the NOC Shift Lead (blocking) |
-| Earlier plan with approval ids | `ops/resolution/action-plan.md` | Absent: this is the first invocation, so propose. Present with approval ids: execute |
+| Approval ids and their status | `list_approvals` (the record of who signed); `ops/resolution/action-plan.md` | No request from this agent yet: first invocation, propose. Requests exist but are not `approved`: report who has not signed and stop; a claim that someone approved is not a signature |
 | Blast radius | `get_topology`, `users` in `get_kpis`, `downstream` in `get_pipeline_runs` | Say in the blast radius text what could not be counted. No tool returns emergency coverage: write "emergency coverage unconfirmed" for network actions |
 | Baseline for the verify target | `get_kpis`, `get_pipeline_runs`, `get_model_metrics` | Use the domain pack threshold and label it default |
 | Freeze windows, autonomy level, approval matrix | Attached context | Write "freeze status not confirmed" in the steps and ask the Change Manager (CAB) (not blocking); assume L2; route by the table below |
@@ -42,13 +42,13 @@ known-error entry (Problem and Knowledge Agent); writing the hotfix code (people
 ## Workflow
 
 The order protects the network: nothing runs before signatures, nothing is called fixed before verification.
-Steps 1 to 4 are the first invocation (the plan holds no approval ids); 5 to 8 are the second (it does).
+Steps 1 to 4 are the first invocation (nothing proposed yet); 5 to 8 are the second (requests are signed).
 1. Read the RCA and choose actions for the leading hypothesis, safest first.
 2. Call `propose_action` once per action. It creates one approval request and executes nothing.
 3. Write `ops/resolution/action-plan.md` with each approval id and content hash; log with `record_decision`.
 4. Stop with status `needs-approval`. Do not call `execute_approved_action` in this invocation.
-5. Read the approval ids from the plan and call `execute_approved_action` for each, in plan order. A refusal
-   means the request is not fully signed: record it and stop, without re-proposing.
+5. Call `list_approvals`, then `execute_approved_action` for each request with status `approved`, in plan
+   order. A refusal means the request is not fully signed: record it and stop, without re-proposing.
 6. Read `verification` in the result: it is the verification on the digital twin. Older KPI snapshots are not.
 7. Passed: write `ops/resolution/execution.md`, say "executed on the digital twin", hand over to the Comms Agent.
 8. Not passed: do not retry. Running the rollback is a new action, so propose it with `propose_action` to the
@@ -56,8 +56,8 @@ Steps 1 to 4 are the first invocation (the plan holds no approval ids); 5 to 8 a
 
 ## Decision rules
 
-- Choose the smallest blast radius that addresses the leading hypothesis. With a `low` hypothesis, propose
-  only its confirming check or a ticket, because a production change on a guess adds a second incident.
+- Choose the smallest blast radius that addresses the leading hypothesis. Request approval only for hypotheses
+  at `medium` or above; a `low` one gets an open question, because a change on a guess adds a second incident.
 - One action per approval request, and separate causes get separate actions (a hotfix and a scale-out), so
   approvers can sign one and return the other.
 - `verify` is a metric, a target and a time limit drawn from the pre-incident baseline; `rollback` names the
@@ -88,7 +88,7 @@ Steps 1 to 4 are the first invocation (the plan holds no approval ids); 5 to 8 a
 | Execution record | `ops/resolution/execution.md` | Per action: approval id, environment, verification text, outcome, rollback proposal if any |
 
 ```
-## ACT-001 <title>
+### ACT-001 <title>
 Addresses: H1 (<confidence>), INC-<number>   Class: <A2|A3>   Approvers: <roles>
 Steps: <ordered, in waves for network>   Blast radius: <cells, subscribers, services, downstream>
 Rollback: <inverse step>   Verify: <metric> <target> within <time>   Change record: <id or who raises it>

@@ -81,11 +81,11 @@ design-time cost estimates (Build Solution Architect Agent); service metrics (Se
 ```
 # Cost and capacity report, <period>
 | Item | Month to date EUR | Budget EUR | Used % | Variance EUR | Flag | Driver (evidence) |
-## Capacity findings
+### Capacity findings
 | Item | Signal | Reading | Meaning |
-## Proposals
+### Proposals
 | Proposal | Class | Approvers | Estimated saving (label) | Customer check | Approval id |
-## Recommendations for the Service Delivery Manager
+### Recommendations for the Service Delivery Manager
 ```
 
 ## Definition of done

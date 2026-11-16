@@ -86,11 +86,11 @@ Capacity Agent); known-error content (Problem and Knowledge Agent); customer mes
 ```
 # Service report, <period or run>
 | Incident | Priority | MTTD | MTTR | Approval wait | Alarm compression | Fix accepted | Source |
-## Deadlines and cost
-## Autonomy evidence
+### Deadlines and cost
+### Autonomy evidence
 | Scenario | Level (source) | Validated runs | Accepted-fix rate | Verification failures | Refusals | Recommendation |
-## Findings
-## Data gaps
+### Findings
+### Data gaps
 ```
 
 ## Definition of done

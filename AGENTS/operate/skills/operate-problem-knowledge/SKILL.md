@@ -80,14 +80,14 @@ Agent); incident messages (Comms Agent); trend metrics across incidents (Service
 ```
 # KE-<id> update (draft for the Problem Manager)
 Source: INC-<number>   Type: <update|new>   Cause status: <confirmed|probable|not established>
-## Symptoms
-## Cause
-## Pre-checks (read-only)
+### Symptoms
+### Cause
+### Pre-checks (read-only)
 | Check | Data to read | Matches when |
-## Workaround and fix
+### Workaround and fix
 | Step | Action class | Approvers | Verify |
-## What this incident adds
-## Prevention (recommendations)
+### What this incident adds
+### Prevention (recommendations)
 | Action | Owner role |
 ```
 

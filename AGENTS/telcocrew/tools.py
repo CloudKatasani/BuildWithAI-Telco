@@ -560,7 +560,8 @@ DESCRIPTIONS = {
     "get_pipeline_runs": "Get data pipeline state for the scenario: feed lag against SLA, failed dbt models with their error and downstream "
                          "objects, and delivery forecasts against deadlines.",
     "get_model_metrics": "Get model monitoring data: population stability index per feature and precision by segment against validation.",
-    "get_cost_usage": "Get month-to-date spend against budget for compute, platform and network energy items.",
+    "get_cost_usage": "Get month-to-date spend against budget for compute, platform and network energy items, with notes where the "
+                      "data suggests a saving. Use it to quantify overspend before proposing anything.",
     "propose_action": "Propose one runbook action for human approval. State the class (A2 reversible and bounded, A3 production), the steps, "
                       "blast radius, rollback, the verification check with its metric and time limit, the change record for A3, and the approver "
                       "roles (A3 needs two different roles). Creates an approval request and executes nothing. Deletes, access grants, disabling "

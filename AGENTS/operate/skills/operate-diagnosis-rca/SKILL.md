@@ -84,10 +84,10 @@ Work until each plausible cause is separated from the others by an observation o
 # RCA INC-<number>
 Leading hypothesis: H1 (<confidence>) or "unknown"
 | H | Hypothesis | Evidence for | Evidence against | Confidence | Check that would settle it | Fix direction |
-## Comparisons
+### Comparisons
 | Compared | Affected | Unaffected | Reading |
-## Known errors matched
-## Not checked, and why
+### Known errors matched
+### Not checked, and why
 ```
 
 ## Definition of done

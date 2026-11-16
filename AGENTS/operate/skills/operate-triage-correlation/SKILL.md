@@ -32,7 +32,7 @@ Agent); proposing a fix (Resolution Agent); deadline forecasts (SLA and Batch Gu
 
 | Input | Where it comes from | If it is missing |
 |---|---|---|
-| Events | `ops/watch/events.md` through `read_artifact` | Build the list from `get_alarms` and `get_kpis`, and say in the record that it was built without the Watch Desk |
+| Events | `ops/watch/events.md` through `read_artifact`, refreshed with `get_alarms` | Build the list from `get_alarms` and `get_kpis`, and say in the record that it was built without the Watch Desk |
 | Affected path | `get_topology` on each cluster, router and service id | Use the `known` list the tool returns for an unknown element; if still unknown, mark the path `unknown` and ask the NOC Shift Lead (not blocking) |
 | Subscribers affected | `users` in `get_kpis` for the affected cluster | Write "not counted" and score the higher priority band |
 | Changes in the window | `get_recent_changes` | Write "no change records returned"; that is not evidence that nothing changed |
@@ -41,7 +41,7 @@ Agent); proposing a fix (Resolution Agent); deadline forecasts (SLA and Batch Gu
 
 ## Workflow
 
-1. Group the events; each joins an incident for a written reason (see Decision rules).
+1. Read the events, refresh them with `get_alarms`, and group them; each joins for a written reason.
 2. Count impact before setting priority, with `get_topology` and `get_kpis`: cells, subscribers, services on
    each shared router, and the account behind each service (call `get_topology` on the service id).
 3. List changes from `get_recent_changes` that touch the path, with the gap to the first event.
@@ -82,14 +82,14 @@ Agent); proposing a fix (Resolution Agent); deadline forecasts (SLA and Batch Gu
 ```
 # INC-<number>: <symptom in one line, no cause>
 Priority: P<n> (<rule that set it>)   First event: <time>   Status: open
-## Events
+### Events
 | Event | Element | Joined because |
-## Affected path: <cells> -> <sites> -> <router> -> <services> -> <accounts>
-## Impact
+### Affected path: <cells> -> <sites> -> <router> -> <services> -> <accounts>
+### Impact
 | Measure | Value | Source | Label |
-## Changes in the window (context, not cause)
+### Changes in the window (context, not cause)
 | Change | Time | Element | Gap to first event |
-## Findings and open questions
+### Findings and open questions
 ```
 
 ## Definition of done

@@ -11,7 +11,7 @@ gate: none
 approvers: [NOC Shift Lead, Service Delivery Manager, Change Manager (CAB)]
 workspace: ops/resolution/
 skills: telco-shared-guardrails, telco-domain-pack, operate-resolution
-tools: read_artifact, write_artifact, get_alarms, get_kpis, get_topology, get_recent_changes, search_kedb, get_pipeline_runs, get_model_metrics, propose_action, execute_approved_action, record_decision, ask_open_question
+tools: read_artifact, write_artifact, get_alarms, get_kpis, get_topology, get_recent_changes, search_kedb, get_pipeline_runs, get_model_metrics, propose_action, execute_approved_action, list_approvals, record_decision, ask_open_question
 expects:
 - ops/diagnosis/rca.md from the Diagnosis and RCA Agent
 - ops/resolution/action-plan.md with approval ids, on the second invocation
@@ -45,8 +45,8 @@ Tool policy
 - May not: execute in the invocation that proposed; execute without a fully signed approval id;
   propose A4 content.
 
-You are invoked twice. Start by reading `ops/resolution/action-plan.md`: if it is absent or holds
-no approval ids, read `ops/diagnosis/rca.md`, propose, write the plan and stop with status
-`needs-approval`. If it holds approval ids, execute them, read each verification result, write
-`ops/resolution/execution.md` and hand over to the Comms Agent, or hand back to the Diagnosis
-and RCA Agent when verification does not pass.
+You are invoked twice. Start by reading `ops/resolution/action-plan.md` and the task. If nothing
+has been proposed yet, read `ops/diagnosis/rca.md`, propose, write the plan and stop with status
+`needs-approval`. If the requests are signed, execute them by approval id, read each verification
+result, write `ops/resolution/execution.md` and hand over to the Comms Agent, or hand back to the
+Diagnosis and RCA Agent when verification does not pass.

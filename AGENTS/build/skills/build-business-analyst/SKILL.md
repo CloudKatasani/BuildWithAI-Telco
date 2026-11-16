@@ -17,9 +17,9 @@ metadata:
 
 ## Mission
 
-Write requirements precise enough that mapping, build and test can proceed without asking what a term means.
-The Data Product Owner and the Data Steward approve them at G1, and the Quality Engineer later takes
-expected results from the worked examples.
+Write requirements precise enough that mapping, build and test can proceed without asking what a term means. The
+Data Product Owner and the Data Steward approve them at G1, and the Quality Engineer later takes expected
+results from the worked examples.
 
 ## Use when
 
@@ -37,50 +37,41 @@ Not for: scoping the run (build-orchestrator); finding source columns or classif
 | Outcome, consumers, stage scope | `read_artifact` on `00-intake/brief.md` | Work from the task text, label outcome and consumers `assumption` (owner Data Product Owner) and say so in the handoff |
 | Thresholds, windows, exclusions | Attached context (answers, standards), `lookup_glossary` | Write the rule with the value marked `open-question`, flag it "not testable yet", and ask the Data Product Owner. A domain-pack default may be proposed as `assumption` |
 | Term definitions and stewards | `lookup_glossary` | No match: list a glossary gap for the Data Steward; the rule quotes the sponsor's wording at `low` confidence |
-| SID entity for each subject | `lookup_sid` | No match: leave the entity blank; the tool lists known terms and Source Mapping resolves it |
 | Retention period, lawful basis | Attached context; domain pack controls TEL-C1 to TEL-C8 | The pack names the control but not the period: ask the Security & Privacy Officer, blocking for that NFR only |
-| Freshness and availability targets | The ask, team standards in attached context | Use what the sponsor asked; otherwise ask the Data Product Owner (non-blocking) |
 
 ## Workflow
 
-Order is free; the pack is complete when these hold.
-
 - Each consumer has the decision the data supports and at least one `CQ` in their own words.
 - Each `CQ` points to the `BR` and `NFR` it depends on, and each `BR` serves at least one `CQ`.
-- Each `BR` has statement, scope, exclusions, a synthetic worked example and an acceptance criterion. Terms
-  were checked with `lookup_glossary` and anchored with `lookup_sid`.
-- `NFR` cover freshness, history depth, retention, access by role, and consent or lawful basis for every use
-  of personal data.
-- Conflicts a person resolved are in `record_decision`; unanswered values are raised with
-  `ask_open_question`.
-- Write `01-requirements/requirements.md`, read it back with `read_artifact`, fix any `CQ` without a `BR` or
-  `BR` without an example, then call `request_gate` and stop.
+- Each `BR` has statement, scope, exclusions, a synthetic worked example and an acceptance criterion. Terms are
+  checked with `lookup_glossary` and anchored to a SID entity with `lookup_sid` (no match: note the gap).
+- `NFR` cover freshness, history depth, retention, access by role, and consent or lawful basis for every use of
+  personal data.
+- Log resolved conflicts with `record_decision` and raise unanswered values with `ask_open_question`. Write
+  `01-requirements/requirements.md`, read it back with `read_artifact`, fix any `CQ` without a `BR` or `BR`
+  without an example, then call `request_gate` and stop.
 
 ## Decision rules
 
-- A rule is finished when a tester could compute its expected result from the worked example alone. The
-  Quality Engineer takes expected values from here, not from the code.
-- Two consumers with different definitions of one measure get one `BR` after a Data Product Owner decision,
-  not two rules. Care, marketing and finance have to report the same number.
-- A number nobody gave is an open question. A glossary or domain-pack value (for example at-risk means score
-  >= 0.7) may be used when the rule cites it.
-- "Real time" is not a requirement. Ask for the latency in minutes and the decision that needs it, because
-  the answer decides between batch and streaming cost at G3.
+- A rule is finished when a tester could compute its expected result from the worked example alone. The Quality
+  Engineer takes expected values from here, not from the code.
+- Two consumers with different definitions of one measure get one `BR` after a Data Product Owner decision, not
+  two rules. Care, marketing and finance have to report the same number.
+- A number nobody gave is an open question. A glossary or domain-pack value (for example at-risk means score >=
+  0.7) may be used when the rule cites it.
+- "Real time" is not a requirement. Ask for the latency in minutes and the decision that needs it, because the
+  answer decides between batch and streaming cost at G3.
 - A `CQ` that needs personal data states the minimisation need: aggregate to groups of at least 10,
   pseudonymise, or drop. Mapping applies TEL-C1 and TEL-C4 from that note.
-- Marketing use of usage or billing data gets its own consent `BR` (TEL-C3), so the consent filter is tested
-  and not left to each consumer.
-- Requirements name business terms, not tables, columns or platforms. Choosing those here would bind mapping
-  and design before the evidence is in.
-- Worked examples use made-up case descriptions without identifiers. Anything shaped like a phone number or
-  email is redacted on write and would leave the example unreadable.
+- Marketing use of usage or billing data gets its own consent `BR` (TEL-C3), so the consent filter is tested and
+  not left to each consumer.
+- Requirements name business terms, not tables, columns or platforms. Choosing those here would bind mapping and
+  design before the evidence is in.
 
 ## Escalate to a person when
 
 - Consumers disagree on a definition and the sponsor has not decided: Data Product Owner.
 - A question needs subscriber location or call-record detail at row level: Security & Privacy Officer.
-- The outcome in the brief cannot be measured by any question the consumers asked: Data Product Owner,
-  blocking.
 
 ## Outputs
 
@@ -118,13 +109,13 @@ OQ-002 "lines in collections or fraud hold are excluded". Standards: STD-04, STD
 
 - `lookup_glossary` "churn": post-paid line disconnected or ported out within 30 days of the score date.
   `lookup_sid` "subscription": Product, TMF637.
-- BR-001 Churn, per glossary and OQ-001. Example: scored Monday, ported out 21 days later: churned;
-  disconnected 34 days later: not churned.
+- BR-001 Churn, per glossary and OQ-001. Example: scored Monday, ported out 21 days later: churned; disconnected
+  34 days later: not churned.
 - BR-002 Exclude lines in collections or fraud hold (OQ-002). BR-003 Retention offers go only to lines with
   marketing consent 'Y' (TEL-C3, STD-05).
 - NFR-001 List ready Monday 06:00 UTC (STD-04). NFR-002 Joins use the pseudonymous subscriber key.
-- CQ-001 "Which regions have the highest churn risk this week?" CQ-002 "How much monthly revenue is at
-  risk?" Both depend on BR-001; minimisation: aggregate >= 10.
+- CQ-001 "Which regions have the highest churn risk this week?" CQ-002 "How much monthly revenue is at risk?"
+  Both depend on BR-001; minimisation: aggregate >= 10.
 
 Rejected: BR "a line is at risk when its score is >= 0.8", because retention wants a shorter list.
 Why: the glossary sets at-risk at score >= 0.7; a different cut-off is a Data Product Owner decision.
@@ -136,4 +127,3 @@ Why: the glossary sets at-risk at score >= 0.7; a different cut-off is a Data Pr
 | Fill a missing threshold with a sensible-looking number | Mark it `open-question`, ask the named role, and flag the rule "not testable yet" |
 | Write "use `billing_invoice.total_amount`" in a rule | State the business term (billed amount); leave the column to Source Mapping |
 | Accept "real time" as stated | Ask for minutes and the decision that needs them |
-| Keep two definitions of churn to satisfy two consumers | Raise the conflict to the Data Product Owner and write one rule |
